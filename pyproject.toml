@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = [
-    "src/agents"
+    "src/agentic"
 ]
 
 [project]
@@ -14,6 +14,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "dotenv>=0.9.9",
     "fastapi>=0.128.0",
+    "langchain[google-genai]>=1.2.3",
     "langgraph>=1.0.5",
+    "typing>=3.10.0.0",
 ]
