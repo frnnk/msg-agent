@@ -5,7 +5,7 @@ Implementation of several agent nodes within the message assistant agentic syste
 import os
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from mcp.adapter import get_tools
+from mcp.adapter import TOOLS
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
