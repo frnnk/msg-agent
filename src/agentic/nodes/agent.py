@@ -5,6 +5,7 @@ Implementation of several agent nodes within the message assistant agentic syste
 import os
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
+from agentic.state import RequestState
 from mcp.adapter import TOOLS
 
 load_dotenv()
@@ -16,7 +17,13 @@ model = init_chat_model(
     temperature=0
 )
 
-async def classify_intent(state):
+async def policy_router(state: RequestState):
+    pass
+
+async def task_executor(state: RequestState):
+    pass
+
+async def response_formatter(state: RequestState):
     pass
 
 if __name__ == '__main__':
