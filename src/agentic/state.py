@@ -21,7 +21,7 @@ class PendingMCPElicitation(TypedDict):
     schema: NotRequired[dict]  # JSON schema for form mode
     message: NotRequired[str]
 
-PendingAction = PendingApproval | PendingMCPElicitation | None
+PendingAction = PendingApproval | None
 
 class RequestState(MessagesState):
     pending_action: PendingAction

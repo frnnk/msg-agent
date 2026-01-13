@@ -5,8 +5,9 @@ Implementation of several agent nodes within the message assistant agentic syste
 import os
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
+from langchain.messages import SystemMessage, HumanMessage
 from agentic.state import RequestState
-from mcp.adapter import TOOLS
+from agentic.prompts import POLICY_ROUTER, PolicyRouterOut
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -18,6 +19,15 @@ model = init_chat_model(
 )
 
 async def policy_router(state: RequestState):
+    structured_model = model.with_structured_output(PolicyRouterOut)
+    message = await structured_model.ainvoke(
+        [
+            SystemMessage(
+                content=POLICY_ROUTER
+            )
+        ]
+        + state['messages']
+    )
     pass
 
 async def task_executor(state: RequestState):
@@ -27,5 +37,13 @@ async def response_formatter(state: RequestState):
     pass
 
 if __name__ == '__main__':
-    response = model.invoke("what is chocolate made from")
-    print(response)
+    structured_model = model.with_structured_output(PolicyRouterOut)
+    message = structured_model.invoke(
+        [
+            SystemMessage(
+                content=POLICY_ROUTER
+            )
+        ]
+        + [HumanMessage("Create an event next Tuesday")]
+    )
+    print(message)

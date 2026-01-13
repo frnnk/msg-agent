@@ -20,6 +20,7 @@ CLIENT = MultiServerMCPClient(
 )
 TOOLS = asyncio.run(CLIENT.get_tools())
 
+
 async def get_tools_by_server(server_name: str = None):
     tools = await CLIENT.get_tools(server_name=server_name)
     return tools
