@@ -10,6 +10,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 load_dotenv()
 ASSISTANT_MCP = os.getenv('ASSISTANT_MCP_URL')
+
 CLIENT = MultiServerMCPClient(
     {
         'assistant': {
@@ -19,6 +20,10 @@ CLIENT = MultiServerMCPClient(
     }
 )
 TOOLS = asyncio.run(CLIENT.get_tools())
+TOOL_MAPPING = {
+    'calendar': ["list_calendars", "list_events", "create_event", "update_event"],
+    'maps': ["add_bookmark", "search_nearby", "search_place"]
+}
 
 
 async def get_tools_by_server(server_name: str = None):

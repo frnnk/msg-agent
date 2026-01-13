@@ -28,7 +28,11 @@ async def policy_router(state: RequestState):
         ]
         + state['messages']
     )
-    pass
+    schema = message.model_dump()
+
+    return {
+        'allowed_tool_types': schema['allowed_tool_types']
+    }
 
 async def task_executor(state: RequestState):
     pass
@@ -44,6 +48,6 @@ if __name__ == '__main__':
                 content=POLICY_ROUTER
             )
         ]
-        + [HumanMessage("Create an event next Tuesday")]
+        + [HumanMessage("Find and book a reservation for next Tuesday")]
     )
-    print(message)
+    print(message.model_dump())

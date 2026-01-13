@@ -25,5 +25,5 @@ PendingAction = PendingApproval | None
 
 class RequestState(MessagesState):
     pending_action: PendingAction
-    allowed_tool_names: list[str]
+    allowed_tool_types: list[str]
 

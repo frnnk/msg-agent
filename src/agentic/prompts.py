@@ -3,7 +3,7 @@ Provides prompts for agent nodes.
 """
 
 import json
-from mcp_module.adapter import TOOLS
+from mcp_module.adapter import TOOL_MAPPING
 from pydantic import BaseModel, Field
 from typing import List
 
@@ -16,23 +16,27 @@ def tool_catalog(tools):
         for t in tools
     ]
 
-POLICY_ROUTER = f"""You are PolicyRouter. Decide which tools are permitted for this request.
+POLICY_ROUTER = f"""You are PolicyRouter. Decide which tool types are allowed for this request.
 
-Tools:
-{json.dumps(tool_catalog(TOOLS), ensure_ascii=False)}
+Current list of tool types:
+{list(TOOL_MAPPING)}
+
+Full mapping of tool types to list of tools:
+{TOOL_MAPPING}
 
 Rules:
-- Only include tools from the provided tool catalog that can complete the request.
-- Prefer the smallest set of tools needed.
-- If no tools are allowed, set decision="refuse" and explain briefly in note; allowed_tools must be [].
-- Otherwise if tools are allowed, set decision="allow" and briefly explain rationale in note; allowed_tools must be a list of tool name strings.
+- Only select tool types from the provided tool mapping.
+- Prefer the smallest set of tool types needed.
+- If no tool types are allowed, set decision="refuse" and explain briefly in note; allowed_tool_types must be [].
+- Otherwise if tools are allowed, set decision="allow" and briefly explain rationale in note; allowed_tool_types must be a list of tool type strings.
 - No markdown, no extra keys, no text outside JSON.
 """
 
 class PolicyRouterOut(BaseModel):
     decision: str
     note: str
-    allowed_tools: List[str]
+    allowed_tool_types: List[str]
 
 if __name__ == "__main__":
+    print(POLICY_ROUTER)
     pass
