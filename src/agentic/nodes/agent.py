@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage, HumanMessage
 from agentic.state import RequestState
-from agentic.prompts import POLICY_ROUTER, PolicyRouterOut
+from agentic.schema.prompts import POLICY_ROUTER
+from agentic.schema.models import PolicyRouterOut
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -48,6 +49,6 @@ if __name__ == '__main__':
                 content=POLICY_ROUTER
             )
         ]
-        + [HumanMessage("Find and book a reservation for next Tuesday")]
+        + [HumanMessage("Create a reservation for next Tuesday")]
     )
     print(message.model_dump())
