@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage, HumanMessage
 from agentic.state import RequestState
-from agentic.schema.prompts import POLICY_ROUTER
+from agentic.schema.prompts import POLICY_ROUTER, TASK_EXECUTOR
 from agentic.schema.models import PolicyRouterOut
+from mcp_module.adapter import TOOL_MAPPING, TOOLS
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -36,19 +37,34 @@ async def policy_router(state: RequestState):
     }
 
 async def task_executor(state: RequestState):
-    pass
+    allowed_tool_types = [TOOL_MAPPING[tool_type] for tool_type in state['allowed_tool_types']]
+    allowed_tools = {tool for tool_type_list in allowed_tool_types for tool in tool_type_list}
+    tools = [tool for tool in TOOLS if tool.name in allowed_tools]
+    tool_model = model.bind_tools(tools=tools)
+
+    message = await tool_model.ainvoke(
+        [
+            SystemMessage(
+                content=TASK_EXECUTOR
+            )
+        ]
+        + state['messages']
+    )
+    return {
+        'messages': message
+    }
 
 async def response_formatter(state: RequestState):
     pass
 
 if __name__ == '__main__':
-    structured_model = model.with_structured_output(PolicyRouterOut)
-    message = structured_model.invoke(
+    tool_model = model.bind_tools(tools=TOOLS)
+    message = tool_model.invoke(
         [
             SystemMessage(
-                content=POLICY_ROUTER
+                content=TASK_EXECUTOR
             )
         ]
-        + [HumanMessage("Create a reservation for next Tuesday")]
+        + [HumanMessage("what events are on my calendar for the next week?")]
     )
-    print(message.model_dump())
+    print(message)
