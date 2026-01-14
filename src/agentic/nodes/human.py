@@ -19,3 +19,6 @@ async def human_confirmation(state: RequestState):
 
     # for now before we have checkpoint working, just stop and raise an error to stop
     pass
+
+async def human_inquiry(state: RequestState):
+    pass
