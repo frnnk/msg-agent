@@ -2,23 +2,15 @@
 Main entrypoint for the agentic system.
 """
 
+from typing import Literal
 from langgraph.graph import StateGraph, START, END
+from langchain.messages import HumanMessage
 from agentic.state import RequestState
 from agentic.nodes.agent import policy_router, task_executor
 from agentic.nodes.tool import use_tools
 from agentic.nodes.human import human_confirmation, human_inquiry
-from langchain.messages import HumanMessage
-from typing import Literal
+from agentic.edges import should_continue
 
-def should_continue(state: RequestState) -> Literal["use_tools", END]:
-    """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
-    messages = state["messages"]
-    last_message = messages[-1]
-
-    if last_message.tool_calls:
-        return "use_tools"
-
-    return END
 
 graph_config = StateGraph(state_schema=RequestState)
 graph_config.add_node("policy_router", policy_router)
