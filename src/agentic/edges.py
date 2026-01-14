@@ -14,11 +14,11 @@ def continue_to_tool(state: RequestState):
     if last_message.tool_calls:
         return "use_tools"
 
-    return END
+    return "response_formatter"
 
 def oauth_url_detection(state: RequestState):
-    """Route to END if URL OAuth is detected, otherwise continue to task executor"""
-    if state["pending_action"] is not None and state['pending_action']["kind"] == "mcp_elicitation":
-        return END
+    """Route to response_formatter if URL OAuth is detected, otherwise continue to task executor"""
+    if state.get('is_oauth'):
+        return "response_formatter"
 
     return "task_executor"

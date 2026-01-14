@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage, HumanMessage
 from agentic.state import RequestState
-from agentic.schema.prompts import POLICY_ROUTER, TASK_EXECUTOR
+from agentic.schema.prompts import POLICY_ROUTER, TASK_EXECUTOR, RESPONSE_FORMATTER
 from agentic.schema.models import PolicyRouterOut
 from mcp_module.adapter import TOOL_MAPPING, TOOLS
 
@@ -32,7 +32,7 @@ async def policy_router(state: RequestState):
         + state['messages']
     )
     schema = message.model_dump()
-    logging.debug(f"Policy note: {schema['note']}")
+    logging.info(f"Policy note: {schema['note']}")
 
     return {
         'allowed_tool_types': schema['allowed_tool_types']
@@ -43,7 +43,7 @@ async def task_executor(state: RequestState):
     allowed_tools = {tool for tool_type_list in allowed_tool_types for tool in tool_type_list}
     tools = [tool for tool in TOOLS if tool.name in allowed_tools]
     tool_model = model.bind_tools(tools=tools)
-    logging.debug(f"Task allowed tools: {allowed_tools}")
+    logging.info(f"Task allowed tools: {allowed_tools}")
 
     message = await tool_model.ainvoke(
         [
@@ -53,12 +53,32 @@ async def task_executor(state: RequestState):
         ]
         + state['messages']
     )
+    logging.info(f"Task Executor Message: {message.content}")
+    logging.info(f"Task Executor Tools Called: {message.tool_calls}")
+
     return {
         'messages': message
     }
 
 async def response_formatter(state: RequestState):
-    pass
+    pending_action = state.get('pending_action')
+    if state.get('is_oauth'):
+        return {
+            'final_response': pending_action['message'],
+            'is_oauth': True
+        }
+
+    final_response = await model.ainvoke(
+        [
+            SystemMessage(content=RESPONSE_FORMATTER)
+        ]
+        + state['messages']
+    )
+    logging.info(f"Final response: {final_response.content}")
+
+    return {
+        'final_response': final_response.content
+    }
 
 if __name__ == '__main__':
     tool_model = model.bind_tools(tools=TOOLS)
