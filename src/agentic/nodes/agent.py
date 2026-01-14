@@ -10,7 +10,7 @@ from langchain.messages import SystemMessage, HumanMessage
 from agentic.state import RequestState
 from agentic.schema.prompts import POLICY_ROUTER, TASK_EXECUTOR, RESPONSE_FORMATTER
 from agentic.schema.models import PolicyRouterOut
-from mcp_module.adapter import TOOL_MAPPING, TOOLS
+from mcp_module.adapter import TOOL_MAPPING, CLIENT
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -39,10 +39,12 @@ async def policy_router(state: RequestState):
     }
 
 async def task_executor(state: RequestState):
+    all_tools = await CLIENT.get_tools()
     allowed_tool_types = [TOOL_MAPPING[tool_type] for tool_type in state['allowed_tool_types']]
     allowed_tools = {tool for tool_type_list in allowed_tool_types for tool in tool_type_list}
-    tools = [tool for tool in TOOLS if tool.name in allowed_tools]
+    tools = [tool for tool in all_tools if tool.name in allowed_tools]
     tool_model = model.bind_tools(tools=tools)
+    
     logging.info(f"Task allowed tools: {allowed_tools}")
 
     message = await tool_model.ainvoke(
@@ -81,13 +83,4 @@ async def response_formatter(state: RequestState):
     }
 
 if __name__ == '__main__':
-    tool_model = model.bind_tools(tools=TOOLS)
-    message = tool_model.invoke(
-        [
-            SystemMessage(
-                content=TASK_EXECUTOR
-            )
-        ]
-        + [HumanMessage("what events are on my calendar for the next week?")]
-    )
-    print(message)
+    pass

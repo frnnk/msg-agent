@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 packages = [
     "src/agentic",
     "src/mcp_module",
+    "src/utils",
 ]
 
 [project]
