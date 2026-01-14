@@ -2,6 +2,7 @@
 Main entrypoint for the agentic system.
 """
 
+import logging
 from typing import Literal
 from langgraph.graph import StateGraph, START, END
 from langchain.messages import HumanMessage
@@ -9,7 +10,7 @@ from agentic.state import RequestState
 from agentic.nodes.agent import policy_router, task_executor
 from agentic.nodes.tool import use_tools
 from agentic.nodes.human import human_confirmation, human_inquiry
-from agentic.edges import should_continue
+from agentic.edges import continue_to_tool, oauth_url_detection
 
 
 graph_config = StateGraph(state_schema=RequestState)
@@ -22,18 +23,33 @@ graph_config.add_edge(START, "policy_router")
 graph_config.add_edge("policy_router", "task_executor")
 graph_config.add_conditional_edges(
     "task_executor",
-    should_continue,
+    continue_to_tool,
     ["use_tools", END]
 )
-graph_config.add_edge("use_tools", "task_executor")
+graph_config.add_conditional_edges(
+    "use_tools",
+    oauth_url_detection,
+    ["task_executor", END]
+)
 
 graph = graph_config.compile()
 
 if __name__ == "__main__":
     import asyncio
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+    logging.getLogger("httpcore").setLevel(logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.INFO)
+
     message = asyncio.run(graph.ainvoke({
-        "messages": [HumanMessage("Can you show me the events on my primary calendar for the next week")],
+        "messages": [HumanMessage("Show me the events on my primary calendar for the next 7 days.")],
         "pending_action": None,
         "allowed_tool_types": []
     }))
-    print(message)
+    
+    if message['pending_action'] is not None and message['pending_action']['kind'] == 'mcp_elicitation':
+        print(message['pending_action'])
+    else:
+        print(message['messages'][-1])

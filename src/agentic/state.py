@@ -14,14 +14,13 @@ class PendingApproval(TypedDict):
 
 class PendingMCPElicitation(TypedDict):
     kind: Literal["mcp_elicitation"]
-    server_name: str
     mode: Literal["url", "form"]
     elicitation_id: str
     url: NotRequired[str] # for url oauth mode
     schema: NotRequired[dict]  # JSON schema for form mode
     message: NotRequired[str]
 
-PendingAction = PendingApproval | None
+PendingAction = PendingApproval | PendingMCPElicitation | None
 
 class RequestState(MessagesState):
     pending_action: PendingAction

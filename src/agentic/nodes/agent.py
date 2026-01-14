@@ -3,6 +3,7 @@ Implementation of several agent nodes within the message assistant agentic syste
 """
 
 import os
+import logging
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage, HumanMessage
@@ -31,6 +32,7 @@ async def policy_router(state: RequestState):
         + state['messages']
     )
     schema = message.model_dump()
+    logging.debug(f"Policy note: {schema['note']}")
 
     return {
         'allowed_tool_types': schema['allowed_tool_types']
@@ -41,6 +43,7 @@ async def task_executor(state: RequestState):
     allowed_tools = {tool for tool_type_list in allowed_tool_types for tool in tool_type_list}
     tools = [tool for tool in TOOLS if tool.name in allowed_tools]
     tool_model = model.bind_tools(tools=tools)
+    logging.debug(f"Task allowed tools: {allowed_tools}")
 
     message = await tool_model.ainvoke(
         [
