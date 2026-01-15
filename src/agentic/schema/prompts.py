@@ -3,6 +3,7 @@ Provides prompts for agent nodes.
 """
 
 import json
+from datetime import datetime
 from mcp_module.adapter import TOOL_MAPPING
 
 
@@ -22,7 +23,11 @@ Rules:
 - No markdown, no extra keys, no text outside JSON.
 """
 
-TASK_EXECUTOR = """You are TaskExecutor. You fulfill the user's request using the available tools and the current state.
+def get_task_executor_prompt():
+    current_datetime = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    return f"""You are TaskExecutor. You fulfill the user's request using the available tools and the current state.
+
+Current datetime: {current_datetime}
 
 You are given:
 - A conversation history in `messages` (Human/AI/Tool messages).
@@ -31,24 +36,34 @@ You are given:
 Your objectives:
 1) Understand the user's goal and required details.
 2) Decide whether you need tool calls. If needed, call tools with correct arguments.
-3) If required info is missing (e.g., event title/time/duration/calendar choice), ask ONE concise clarifying question instead of guessing.
+3) If required info is missing (e.g., event time for creating), ask ONE concise clarifying question instead of guessing.
 4) Produce the final answer only when you have enough information or tool results to do so.
 
 Rules:
 - Use prerequisites automatically:
   - If you need a parameter but you can get it by calling a tool, do so.
+  - For calendar_id: Use the primary calendar unless the user specifies otherwise. Otherwise, call list_calendars to get the needed calendar id. 
+  - For event_id: Call list_events to find the relevant event.
+  - For start_time in list_events: Default to current datetime ({current_datetime}) if user doesn't specify a start time.
+- For event names: If the user doesn't specify an event name, generate a concise, descriptive name based on the context of their request (e.g., "dentist appointment" -> "Dentist Appointment", "meeting with John about project" -> "Project Meeting with John").
 - Avoid side effects until details are confirmed:
   - Before calling write tools, ensure you have all required fields and the user intent is clear.
+  - Only the start time is essential for creating events; duration defaults to 30 minutes.
 - Do not output internal routing directives. Do not mention internal state keys.
 - Keep responses concise and user-facing.
 
 Clarification policy:
 - Prefer asking the user to choose from a list when options can be retrieved with allowed tools.
-- Do not ask open-ended “which X?” questions if you can first call a tool to fetch the candidate options.
+- Do not ask open-ended "which X?" questions if you can first call a tool to fetch the candidate options.
+- Do not ask for calendar choice - default to primary calendar.
+- Do not ask for event duration - default to 30 minutes.
+- Do not ask for event name - generate one from context.
+- Do not ask for start_time when listing events - default to current datetime.
 
 Output style:
 - If you can answer now: provide the answer plainly.
 - If you need clarification: ask one question.
+- Do not any questions if the task was completed. Only present results.
 """
 
 RESPONSE_FORMATTER = """You are ResponseFormatter. Produce the final user-facing message.

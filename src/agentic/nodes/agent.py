@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage, HumanMessage
 from agentic.state import RequestState
-from agentic.schema.prompts import POLICY_ROUTER, TASK_EXECUTOR, RESPONSE_FORMATTER
+from agentic.schema.prompts import POLICY_ROUTER, get_task_executor_prompt, RESPONSE_FORMATTER
 from agentic.schema.models import PolicyRouterOut
 from mcp_module.adapter import TOOL_MAPPING, CLIENT
 
@@ -55,7 +55,7 @@ async def task_executor(state: RequestState):
     message = await tool_model.ainvoke(
         [
             SystemMessage(
-                content=TASK_EXECUTOR
+                content=get_task_executor_prompt()
             )
         ]
         + state['messages']
