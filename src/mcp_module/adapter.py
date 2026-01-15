@@ -21,7 +21,6 @@ CLIENT = MultiServerMCPClient(
 )
 TOOL_MAPPING = {
     'calendar': ["list_calendars", "list_events", "create_event", "update_event"],
-    'maps': ["add_bookmark", "search_nearby", "search_place"]
 }
 
 
