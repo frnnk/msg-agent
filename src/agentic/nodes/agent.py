@@ -14,10 +14,15 @@ from mcp_module.adapter import TOOL_MAPPING, CLIENT
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 os.environ['GOOGLE_API_KEY'] = GOOGLE_API_KEY
+os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
+
+GEMINI_MODEL = 'google_genai:gemini-2.5-flash-lite'
+GPT_MODEL = 'openai:gpt-5-nano'
 
 model = init_chat_model(
-    model='google_genai:gemini-2.5-flash-lite',
+    model=GPT_MODEL,
     temperature=0
 )
 
@@ -69,6 +74,7 @@ async def response_formatter(state: RequestState):
             'final_response': pending_action['message'],
             'is_oauth': True
         }
+    logging.info(f"Current Messages: {state['messages']}")
 
     final_response = await model.ainvoke(
         [
@@ -76,7 +82,7 @@ async def response_formatter(state: RequestState):
         ]
         + state['messages']
     )
-    logging.info(f"Final response: {final_response.content}")
+    logging.info(f"Final response: {final_response}")
 
     return {
         'final_response': final_response.content
