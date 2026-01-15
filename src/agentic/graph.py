@@ -56,4 +56,6 @@ async def run_graph(thread_id: str, initial_request: str) -> RequestState:
 
 
 if __name__ == "__main__":
+    from IPython.display import Image, display
+    Image(graph.get_graph(xray=True).draw_mermaid_png())
     pass

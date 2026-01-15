@@ -5,6 +5,7 @@ confirmations, form elicitations, and url oauth elicitations.
 
 from agentic.state import RequestState
 from langchain_core.messages import AIMessage
+from langgraph.types import interrupt
 
 
 def get_last_ai_message(state: RequestState):
