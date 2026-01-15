@@ -7,7 +7,7 @@ import logging
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage, HumanMessage
-from agentic.state import RequestState
+from agentic.state import RequestState, NO_ACTION
 from agentic.schema.prompts import POLICY_ROUTER, get_task_executor_prompt, RESPONSE_FORMATTER
 from agentic.schema.models import PolicyRouterOut
 from mcp_module.adapter import TOOL_MAPPING, CLIENT
@@ -68,13 +68,12 @@ async def task_executor(state: RequestState):
     }
 
 async def response_formatter(state: RequestState):
-    pending_action = state.get('pending_action')
-    if state.get('is_oauth'):
+    pending_action = state.get('pending_action', NO_ACTION)
+    if pending_action['kind'] == 'oauth_url':
         return {
-            'final_response': pending_action['message'],
-            'is_oauth': True
+            'final_response': pending_action['message']
         }
-    logging.info(f"Current Messages: {state['messages']}")
+    logging.debug(f"Current Messages: {state['messages']}")
 
     final_response = await model.ainvoke(
         [
@@ -82,7 +81,7 @@ async def response_formatter(state: RequestState):
         ]
         + state['messages']
     )
-    logging.info(f"Final response: {final_response}")
+    logging.info(f"Final response: {final_response.content}")
 
     return {
         'final_response': final_response.content

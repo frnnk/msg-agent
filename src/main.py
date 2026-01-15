@@ -7,19 +7,17 @@ from fastapi import FastAPI, status
 from fastapi.responses import JSONResponse
 from utils.models import RunBody
 from agentic.graph import run_graph
+from agentic.state import NO_ACTION
 
-app = FastAPI()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
-logging.getLogger("httpx").setLevel(logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-@app.get('/')
-async def root():
-    return "Hello world!"
 
+app = FastAPI()
 @app.get('/health-check')
 async def health():
     return "Server is healthy"
@@ -31,7 +29,7 @@ async def run(body: RunBody):
         initial_request=body.user_request
     )
 
-    if final_state.get('is_oauth'):
+    if final_state.get('pending_action', NO_ACTION)['kind'] == 'oauth_url':
         return JSONResponse(
             content={
                 "status": "oauth_required",

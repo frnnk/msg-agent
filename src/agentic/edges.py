@@ -4,7 +4,7 @@ Contains functions representing conditional edges, where routing to nodes depend
 
 import logging
 from langgraph.graph import END
-from agentic.state import RequestState
+from agentic.state import RequestState, NO_ACTION
 
 
 def continue_to_tool(state: RequestState):
@@ -21,7 +21,7 @@ def continue_to_tool(state: RequestState):
 
 def oauth_url_detection(state: RequestState):
     """Route to response_formatter if URL OAuth is detected, otherwise continue to task executor"""
-    if state.get('is_oauth'):
+    if state.get('pending_action', NO_ACTION)['kind'] == 'oauth_url':
         logging.info(f"Routing from Tool Node to response_formatter")
         return "response_formatter"
 

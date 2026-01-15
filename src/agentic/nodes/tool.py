@@ -25,10 +25,8 @@ async def use_tools(state: RequestState):
         if error.code == URL_ELICITATION_ERROR:
             elicitation = data['elicitations'][0]
             return {
-                'is_oauth': True,
                 'pending_action': {
-                    'kind': 'mcp_elicitation',
-                    'mode': 'url',
+                    'kind': 'oauth_url',
                     'elicitation_id': elicitation['elicitationId'],
                     'url': elicitation['url'],
                     'message': elicitation['message']
