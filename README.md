@@ -6,23 +6,21 @@ A LangGraph-based agentic system that acts as an MCP client, consuming tools fro
 
 ```mermaid
 flowchart TD
-    START([START]) --> policy_router
-    policy_router[policy_router<br/>Evaluates allowed tool types] --> task_executor
-    task_executor[task_executor<br/>Main agent loop]
+    START((START)) --> policy_router
+    policy_router --> task_executor
 
-    task_executor -->|tool_calls present| use_tools
-    task_executor -->|no tool_calls| response_formatter
-    task_executor -->|HITL tools detected| human_confirmation
+    task_executor -->|HITL tools| human_confirmation
+    task_executor -->|tool calls| use_tools
+    task_executor -->|no tool calls| response_formatter
 
-    use_tools[use_tools<br/>Execute MCP tools]
-    human_confirmation[human_confirmation<br/>Await user approval]
-
-    use_tools -->|OAuth detected| response_formatter
-    use_tools -->|continue| task_executor
+    human_confirmation[["human_confirmation<br/>(interrupt)"]]
     human_confirmation -->|approved| use_tools
-    human_confirmation -->|rejected| response_formatter
+    human_confirmation -->|all rejected| task_executor
 
-    response_formatter[response_formatter<br/>Final user message] --> END([END])
+    use_tools -->|OAuth URL| response_formatter
+    use_tools -->|continue| task_executor
+
+    response_formatter --> END((END))
 ```
 
 ### Nodes
@@ -42,8 +40,10 @@ flowchart TD
 | `route_from_task_executor` | task_executor | human_confirmation | If HITL tools detected |
 | `route_from_task_executor` | task_executor | use_tools | If tool_calls present |
 | `route_from_task_executor` | task_executor | response_formatter | If no tool_calls |
-| `oauth_url_detection` | use_tools | response_formatter | If OAuth elicitation detected |
+| `oauth_url_detection` | use_tools | response_formatter | If OAuth URL detected |
 | `oauth_url_detection` | use_tools | task_executor | Otherwise (continue loop) |
+| `route_from_human_confirmation` | human_confirmation | use_tools | If any tools approved |
+| `route_from_human_confirmation` | human_confirmation | task_executor | If all rejected |
 
 ## Project Structure
 
