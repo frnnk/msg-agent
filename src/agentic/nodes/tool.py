@@ -7,12 +7,19 @@ from langgraph.prebuilt.tool_node import ToolNode
 from agentic.state import RequestState
 from mcp_module.adapter import CLIENT
 from mcp.shared.exceptions import McpError
-from langchain.messages import ToolMessage
 
 
 URL_ELICITATION_ERROR = -32042
 
 async def use_tools(state: RequestState):
+    """
+    Tool execution node.
+
+    Executes MCP tool calls from the task_executor using LangGraph's ToolNode.
+    Handles OAuth URL elicitation errors by capturing the auth URL in pending_action.
+
+    Returns ToolMessage results to state for the task_executor to process.
+    """
     try:
         tools = await CLIENT.get_tools()
         tool_node = ToolNode(tools)

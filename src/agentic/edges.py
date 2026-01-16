@@ -22,6 +22,7 @@ def route_from_task_executor(state: RequestState):
     logging.info(f"Routing from Task Executor to response_formatter")
     return "response_formatter"
 
+
 def oauth_url_detection(state: RequestState):
     """Route to response_formatter if URL OAuth is detected, otherwise continue to task executor"""
     if state.get('pending_action', NO_ACTION)['kind'] == 'oauth_url':

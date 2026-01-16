@@ -25,10 +25,10 @@ TOOL_MAPPING = {
 HITL_TOOLS = {'create_event', 'update_event'}
 
 
-async def get_tools_by_server(server_name: str = None):
+async def get_tools(server_name: str = None):
     tools = await CLIENT.get_tools(server_name=server_name)
     return tools
 
 
 if __name__ == '__main__':
-    asyncio.run(get_tools_by_server())
+    pass

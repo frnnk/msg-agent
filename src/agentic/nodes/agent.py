@@ -27,6 +27,14 @@ model = init_chat_model(
 )
 
 async def policy_router(state: RequestState):
+    """
+    Policy router node.
+
+    Analyzes the user request to determine which tool types (calendar) are
+    permitted for the current conversation. Adds allowed_tool_types to state.
+
+    Uses structured output to ensure consistent policy decisions.
+    """
     structured_model = model.with_structured_output(PolicyRouterOut)
     message = await structured_model.ainvoke(
         [
@@ -44,6 +52,14 @@ async def policy_router(state: RequestState):
     }
 
 async def task_executor(state: RequestState):
+    """
+    Task executor node.
+
+    Main agent that processes user requests by invoking appropriate MCP tools.
+    Loads tools based on allowed_tool_types from policy_router.
+
+    Detects HITL tools and sets pending_action for human confirmation when needed.
+    """
     all_tools = await CLIENT.get_tools()
     allowed_tool_types = [TOOL_MAPPING[tool_type] for tool_type in state['allowed_tool_types']]
     allowed_tools = {tool for tool_type_list in allowed_tool_types for tool in tool_type_list}
@@ -88,6 +104,14 @@ async def task_executor(state: RequestState):
     }
 
 async def response_formatter(state: RequestState):
+    """
+    Response formatter node.
+
+    Produces the final user-facing message by summarizing the conversation and
+    tool results. Handles OAuth URL elicitation by returning the auth message directly.
+
+    Returns final_response to state for the API to return to the client.
+    """
     pending_action = state.get('pending_action', NO_ACTION)
     if pending_action['kind'] == 'oauth_url':
         return {

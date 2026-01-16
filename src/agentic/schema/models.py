@@ -1,5 +1,5 @@
 """
-Models for how agents should respond.
+Structured models for how agents should respond.
 """
 
 from pydantic import BaseModel, Field

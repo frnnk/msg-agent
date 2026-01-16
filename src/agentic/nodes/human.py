@@ -4,28 +4,19 @@ confirmations, form elicitations, and url oauth elicitations.
 """
 
 from agentic.state import RequestState, NO_ACTION
+from utils.helpers import get_last_ai_message
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.types import interrupt
-
-
-def get_last_ai_message(state: RequestState):
-    """Get the most recent AIMessage from state messages."""
-    for message in reversed(state['messages']):
-        if isinstance(message, AIMessage):
-            return message
-    return None
 
 
 async def human_confirmation(state: RequestState):
     """
     Human-in-the-loop confirmation node.
 
-    Interrupts execution to get user approval for sensitive tool calls.
-    On resume, processes approval results and modifies state accordingly.
+    Interrupts execution to get user approval for tool calls with side effects.
+    Resume with /resume, and processes approval results, modifying state accordingly.
 
     Preserves memory by appending new messages instead of modifying existing ones.
-    For partial approvals, appends a HumanMessage (feedback) and a NEW AIMessage
-    (with only approved tool_calls).
     """
     tool_calls = state['pending_action']['tool_calls']
 
