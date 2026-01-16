@@ -23,3 +23,8 @@ dependencies = [
     "langgraph>=1.0.5",
     "typing>=3.10.0.0",
 ]
+
+[dependency-groups]
+dev = [
+    "rich>=14.2.0",
+]
