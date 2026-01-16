@@ -2,8 +2,18 @@
 Provides FastAPI Pydantic models for various API endpoints.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Any, Literal
 from pydantic import BaseModel
+
+
+class AgentResponse(BaseModel):
+    """Common response model for /run and /resume endpoints"""
+    status: Literal["success", "confirmation_required", "oauth_required", "error"]
+    response: Optional[str] = None
+    thread_id: Optional[str] = None
+    pending_action: Optional[dict[str, Any]] = None
+    url: Optional[str] = None
+    message: Optional[str] = None
 
 
 class RunBody(BaseModel):

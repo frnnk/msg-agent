@@ -3,10 +3,9 @@ Entrypoint for the FastAPI server.
 """
 
 import logging
-from fastapi import FastAPI, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Response, status
 from langgraph.types import Command
-from utils.models import RunBody, ResumeBody
+from utils.models import RunBody, ResumeBody, AgentResponse
 from agentic.graph import run_graph, graph
 from agentic.state import NO_ACTION
 
@@ -23,8 +22,12 @@ app = FastAPI()
 async def health():
     return "Server is healthy"
 
-@app.post('/run')
-async def run(body: RunBody):
+
+@app.post('/run', response_model=AgentResponse)
+async def run(body: RunBody, response: Response):
+    """
+    Initiate a fresh user request.
+    """
     final_state = await run_graph(
         thread_id=body.thread_id,
         initial_request=body.user_request
@@ -33,36 +36,29 @@ async def run(body: RunBody):
     pending = final_state.get('pending_action', NO_ACTION)
 
     if pending['kind'] == 'confirmation':
-        return JSONResponse(
-            content={
-                "status": "confirmation_required",
-                "thread_id": body.thread_id,
-                "pending_action": pending
-            },
-            status_code=status.HTTP_202_ACCEPTED
+        response.status_code = status.HTTP_202_ACCEPTED
+        return AgentResponse(
+            status="confirmation_required",
+            thread_id=body.thread_id,
+            pending_action=pending
         )
 
     if pending['kind'] == 'oauth_url':
-        return JSONResponse(
-            content={
-                "status": "oauth_required",
-                "response": final_state['final_response'],
-                "url": pending['url']
-            },
-            status_code=status.HTTP_202_ACCEPTED
+        response.status_code = status.HTTP_202_ACCEPTED
+        return AgentResponse(
+            status="oauth_required",
+            response=final_state['final_response'],
+            url=pending['url']
         )
 
-    return JSONResponse(
-        content={
-            "status": "success",
-            "response": final_state['final_response'],
-        },
-        status_code=status.HTTP_200_OK
+    return AgentResponse(
+        status="success",
+        response=final_state['final_response']
     )
 
 
-@app.post('/resume')
-async def resume(body: ResumeBody):
+@app.post('/resume', response_model=AgentResponse)
+async def resume(body: ResumeBody, response: Response):
     """
     Resume a paused graph execution with user approval decisions.
 
@@ -85,40 +81,32 @@ async def resume(body: ResumeBody):
 
         pending = final_state.get('pending_action', NO_ACTION)
 
-        # Check if we hit another interrupt (e.g., more tools need confirmation)
         if pending['kind'] == 'confirmation':
-            return JSONResponse(
-                content={
-                    "status": "confirmation_required",
-                    "thread_id": body.thread_id,
-                    "pending_action": pending
-                },
-                status_code=status.HTTP_202_ACCEPTED
+            response.status_code = status.HTTP_202_ACCEPTED
+            return AgentResponse(
+                status="confirmation_required",
+                thread_id=body.thread_id,
+                pending_action=pending
             )
 
-        # Handle OAuth URL if it comes up during resumed execution
         if pending['kind'] == 'oauth_url':
-            return JSONResponse(
-                content={
-                    "status": "oauth_required",
-                    "response": final_state.get('final_response'),
-                    "url": pending['url']
-                },
-                status_code=status.HTTP_202_ACCEPTED
+            response.status_code = status.HTTP_202_ACCEPTED
+            return AgentResponse(
+                status="oauth_required",
+                response=final_state.get('final_response'),
+                url=pending['url']
             )
 
-        return JSONResponse(
-            content={
-                "status": "success",
-                "response": final_state.get('final_response', 'Action completed.')
-            },
-            status_code=status.HTTP_200_OK
+        return AgentResponse(
+            status="success",
+            response=final_state.get('final_response', 'Action completed.')
         )
 
     except Exception as e:
         logging.error(f"Resume error: {e}")
-        return JSONResponse(
-            content={"status": "error", "message": str(e)},
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return AgentResponse(
+            status="error",
+            message=str(e)
         )
 
