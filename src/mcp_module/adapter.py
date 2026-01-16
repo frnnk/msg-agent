@@ -22,6 +22,7 @@ CLIENT = MultiServerMCPClient(
 TOOL_MAPPING = {
     'calendar': ["list_calendars", "list_events", "create_event", "update_event"],
 }
+HITL_TOOLS = {'create_event', 'update_event'}
 
 
 async def get_tools_by_server(server_name: str = None):

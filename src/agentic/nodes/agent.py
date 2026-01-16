@@ -10,7 +10,7 @@ from langchain.messages import SystemMessage, HumanMessage
 from agentic.state import RequestState, NO_ACTION
 from agentic.schema.prompts import POLICY_ROUTER, get_task_executor_prompt, RESPONSE_FORMATTER
 from agentic.schema.models import PolicyRouterOut
-from mcp_module.adapter import TOOL_MAPPING, CLIENT
+from mcp_module.adapter import TOOL_MAPPING, HITL_TOOLS, CLIENT
 
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -48,10 +48,10 @@ async def task_executor(state: RequestState):
     allowed_tool_types = [TOOL_MAPPING[tool_type] for tool_type in state['allowed_tool_types']]
     allowed_tools = {tool for tool_type_list in allowed_tool_types for tool in tool_type_list}
     tools = [tool for tool in all_tools if tool.name in allowed_tools]
-    tool_model = model.bind_tools(tools=tools)
     
     logging.info(f"Task allowed tools: {allowed_tools}")
 
+    tool_model = model.bind_tools(tools=tools)
     message = await tool_model.ainvoke(
         [
             SystemMessage(
@@ -62,6 +62,26 @@ async def task_executor(state: RequestState):
     )
     logging.info(f"Task Executor Message: {message.content}")
     logging.info(f"Task Executor Tools Called: {message.tool_calls}")
+
+    # check for any tool usage that needs human confirmation
+    # extract full tool call info (id, name, args) for HITL tools
+    hitl_tool_calls = [
+        {
+            'call_id': tc['id'],
+            'tool_name': tc['name'],
+            'arguments': tc['args']
+        }
+        for tc in message.tool_calls
+        if tc['name'] in HITL_TOOLS
+    ]
+    if hitl_tool_calls:
+        return {
+            'messages': message,
+            'pending_action': {
+                'kind': 'confirmation',
+                'tool_calls': hitl_tool_calls
+            }
+        }
 
     return {
         'messages': message

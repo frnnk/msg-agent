@@ -11,7 +11,7 @@ from agentic.state import RequestState
 from agentic.nodes.agent import policy_router, task_executor, response_formatter
 from agentic.nodes.tool import use_tools
 from agentic.nodes.human import human_confirmation, human_inquiry
-from agentic.edges import continue_to_tool, oauth_url_detection
+from agentic.edges import route_from_task_executor, oauth_url_detection, route_from_human_confirmation
 
 
 # each node in our agentic system is represented by a function
@@ -20,20 +20,25 @@ graph_config.add_node("policy_router", policy_router)
 graph_config.add_node("task_executor", task_executor)
 graph_config.add_node("response_formatter", response_formatter)
 graph_config.add_node("use_tools", use_tools)
-graph_config.add_node("human_inquiry", human_inquiry)
+graph_config.add_node("human_confirmation", human_confirmation)
 
 # conditional edges use a function to dynamically route
 graph_config.add_edge(START, "policy_router")
 graph_config.add_edge("policy_router", "task_executor")
 graph_config.add_conditional_edges(
     "task_executor",
-    continue_to_tool,
-    ["use_tools", "response_formatter"]
+    route_from_task_executor,
+    ["use_tools", "response_formatter", "human_confirmation"]
 )
 graph_config.add_conditional_edges(
     "use_tools",
     oauth_url_detection,
     ["task_executor", "response_formatter"]
+)
+graph_config.add_conditional_edges(
+    "human_confirmation",
+    route_from_human_confirmation,
+    ["use_tools", "task_executor"]
 )
 graph_config.add_edge("response_formatter", END)
 
@@ -56,6 +61,4 @@ async def run_graph(thread_id: str, initial_request: str) -> RequestState:
 
 
 if __name__ == "__main__":
-    from IPython.display import Image, display
-    Image(graph.get_graph(xray=True).draw_mermaid_png())
     pass
