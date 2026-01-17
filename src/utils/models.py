@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 class AgentResponse(BaseModel):
     """Common response model for /run and /resume endpoints"""
-    status: Literal["success", "confirmation_required", "oauth_required", "error"]
+    status: Literal["success", "confirmation_required", "clarification_required", "oauth_required", "error"]
     response: Optional[str] = None
     thread_id: Optional[str] = None
     pending_action: Optional[dict[str, Any]] = None
@@ -29,7 +29,14 @@ class ToolApproval(BaseModel):
     feedback: Optional[str] = None
 
 
+class ClarificationResponse(BaseModel):
+    """User's response to a single clarification request."""
+    call_id: str
+    response: str
+
+
 class ResumeBody(BaseModel):
-    """Request body for resuming after human confirmation interrupt"""
+    """Request body for resuming after human confirmation or clarification interrupt"""
     thread_id: str
-    approvals: List[ToolApproval]
+    approvals: Optional[List[ToolApproval]] = None
+    clarification_responses: Optional[List[ClarificationResponse]] = None

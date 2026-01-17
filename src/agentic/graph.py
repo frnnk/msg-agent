@@ -10,8 +10,8 @@ from langchain.messages import HumanMessage
 from agentic.state import RequestState
 from agentic.nodes.agent import policy_router, task_executor
 from agentic.nodes.tool import use_tools
-from agentic.nodes.human import human_confirmation, human_inquiry, oauth_needed
-from agentic.edges import route_from_task_executor, oauth_url_detection, route_from_human_confirmation
+from agentic.nodes.human import human_confirmation, human_clarification, oauth_needed
+from agentic.edges import route_from_task_executor, oauth_url_detection, route_from_human_confirmation, route_from_human_clarification
 
 
 # each node in our agentic system is represented by a function
@@ -20,6 +20,7 @@ graph_config.add_node("policy_router", policy_router)
 graph_config.add_node("task_executor", task_executor)
 graph_config.add_node("use_tools", use_tools)
 graph_config.add_node("human_confirmation", human_confirmation)
+graph_config.add_node("human_clarification", human_clarification)
 graph_config.add_node("oauth_needed", oauth_needed)
 
 # conditional edges use a function to dynamically route
@@ -28,7 +29,7 @@ graph_config.add_edge("policy_router", "task_executor")
 graph_config.add_conditional_edges(
     "task_executor",
     route_from_task_executor,
-    ["use_tools", "human_confirmation", END]
+    ["use_tools", "human_confirmation", "human_clarification", END]
 )
 graph_config.add_conditional_edges(
     "use_tools",
@@ -39,6 +40,11 @@ graph_config.add_conditional_edges(
     "human_confirmation",
     route_from_human_confirmation,
     ["use_tools", "task_executor"]
+)
+graph_config.add_conditional_edges(
+    "human_clarification",
+    route_from_human_clarification,
+    ["use_tools", "human_confirmation", "task_executor"]
 )
 graph_config.add_edge("oauth_needed", END)
 

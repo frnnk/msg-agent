@@ -11,15 +11,20 @@ def route_from_task_executor(state: RequestState):
     """Decide if we should continue the loop or stop based upon whether the LLM made a tool call"""
     messages = state["messages"]
     last_message = messages[-1]
+    pending_kind = state.get('pending_action', NO_ACTION)['kind']
 
-    if state.get('pending_action', NO_ACTION)['kind'] == 'confirmation':
+    if pending_kind == 'clarification':
+        logging.info("Routing from Task Executor to human_clarification")
+        return "human_clarification"
+
+    if pending_kind == 'confirmation':
         return "human_confirmation"
 
     if last_message.tool_calls:
-        logging.info(f"Routing from Task Executor to use_tools")
+        logging.info("Routing from Task Executor to use_tools")
         return "use_tools"
 
-    logging.info(f"Routing from Task Executor to END")
+    logging.info("Routing from Task Executor to END")
     return END
 
 
@@ -51,4 +56,26 @@ def route_from_human_confirmation(state: RequestState):
         return "use_tools"
 
     logging.info("Routing from human_confirmation to task_executor (all rejected)")
+    return "task_executor"
+
+
+def route_from_human_clarification(state: RequestState):
+    """
+    Route based on post-clarification state:
+    - If HITL tools pending -> human_confirmation
+    - If remaining tools exist -> use_tools
+    - Otherwise -> task_executor
+    """
+    pending_kind = state.get('pending_action', NO_ACTION)['kind']
+
+    if pending_kind == 'confirmation':
+        logging.info("Routing from human_clarification to human_confirmation")
+        return "human_confirmation"
+
+    messages = state.get('messages', [])
+    if messages and hasattr(messages[-1], 'tool_calls') and messages[-1].tool_calls:
+        logging.info("Routing from human_clarification to use_tools")
+        return "use_tools"
+
+    logging.info("Routing from human_clarification to task_executor")
     return "task_executor"

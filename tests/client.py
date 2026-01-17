@@ -34,6 +34,16 @@ def display_tool_call(tc: dict) -> None:
     console.print(table)
 
 
+def display_clarification(clarification: dict) -> None:
+    """Display a clarification request."""
+    question = clarification.get("question", "No question provided")
+    context = clarification.get("context", "")
+
+    console.print(f"\n[bold cyan]Question:[/bold cyan] {question}")
+    if context:
+        console.print(f"[dim]Context: {context}[/dim]")
+
+
 def handle_success(response: dict) -> None:
     """Display successful response."""
     console.print(
@@ -96,7 +106,34 @@ def handle_confirmation(response: dict, thread_id: str) -> None:
         approvals.append(approval)
 
     console.print("\n[dim]Sending approval decisions...[/dim]")
-    resume_response = send_resume(thread_id, approvals)
+    resume_response = send_resume(thread_id, approvals=approvals)
+    handle_response(resume_response, thread_id)
+
+
+def handle_clarification(response: dict, thread_id: str) -> None:
+    """Handle clarification flow with user input prompts."""
+    console.print(
+        Panel(
+            "The agent needs clarification:",
+            title="[yellow]CLARIFICATION REQUIRED[/yellow]",
+            border_style="yellow",
+        )
+    )
+
+    clarifications = response["pending_action"]["clarifications"]
+    responses = []
+
+    for clarification in clarifications:
+        display_clarification(clarification)
+
+        user_response = Prompt.ask("\nYour response")
+        responses.append({
+            "call_id": clarification["call_id"],
+            "response": user_response
+        })
+
+    console.print("\n[dim]Sending clarification responses...[/dim]")
+    resume_response = send_resume(thread_id, clarification_responses=responses)
     handle_response(resume_response, thread_id)
 
 
@@ -110,13 +147,20 @@ def send_run(thread_id: str, user_request: str) -> dict:
         return resp.json()
 
 
-def send_resume(thread_id: str, approvals: list) -> dict:
-    """Send approvals to /resume endpoint."""
+def send_resume(
+    thread_id: str,
+    approvals: list = None,
+    clarification_responses: list = None
+) -> dict:
+    """Send approvals or clarification responses to /resume endpoint."""
+    payload = {"thread_id": thread_id}
+    if approvals is not None:
+        payload["approvals"] = approvals
+    if clarification_responses is not None:
+        payload["clarification_responses"] = clarification_responses
+
     with httpx.Client(timeout=120.0) as client:
-        resp = client.post(
-            f"{SERVER_URL}/resume",
-            json={"thread_id": thread_id, "approvals": approvals},
-        )
+        resp = client.post(f"{SERVER_URL}/resume", json=payload)
         return resp.json()
 
 
@@ -128,6 +172,8 @@ def handle_response(response: dict, thread_id: str) -> None:
         handle_success(response)
     elif status == "oauth_required":
         handle_oauth(response)
+    elif status == "clarification_required":
+        handle_clarification(response, thread_id)
     elif status == "confirmation_required":
         handle_confirmation(response, thread_id)
     elif status == "error":

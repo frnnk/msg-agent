@@ -35,6 +35,14 @@ async def run(body: RunBody, response: Response):
 
     pending = final_state.get('pending_action', NO_ACTION)
 
+    if pending['kind'] == 'clarification':
+        response.status_code = status.HTTP_202_ACCEPTED
+        return AgentResponse(
+            status="clarification_required",
+            thread_id=body.thread_id,
+            pending_action=pending
+        )
+
     if pending['kind'] == 'confirmation':
         response.status_code = status.HTTP_202_ACCEPTED
         return AgentResponse(
@@ -60,26 +68,48 @@ async def run(body: RunBody, response: Response):
 @app.post('/resume', response_model=AgentResponse)
 async def resume(body: ResumeBody, response: Response):
     """
-    Resume a paused graph execution with user approval decisions.
+    Resume a paused graph execution with user approval or clarification responses.
 
-    Used to continue after human_confirmation interrupt.
+    Used to continue after human_confirmation or human_clarification interrupt.
     """
-    approval_data = [
-        {
-            'call_id': a.call_id,
-            'approved': a.approved,
-            'feedback': a.feedback
+    if body.clarification_responses is not None:
+        resume_data = {
+            'responses': [
+                {'call_id': r.call_id, 'response': r.response}
+                for r in body.clarification_responses
+            ]
         }
-        for a in body.approvals
-    ]
+    elif body.approvals is not None:
+        resume_data = [
+            {
+                'call_id': a.call_id,
+                'approved': a.approved,
+                'feedback': a.feedback
+            }
+            for a in body.approvals
+        ]
+    else:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return AgentResponse(
+            status="error",
+            message="Must provide approvals or clarification_responses"
+        )
 
     try:
         final_state = await graph.ainvoke(
-            Command(resume=approval_data),
+            Command(resume=resume_data),
             config={"configurable": {"thread_id": body.thread_id}}
         )
 
         pending = final_state.get('pending_action', NO_ACTION)
+
+        if pending['kind'] == 'clarification':
+            response.status_code = status.HTTP_202_ACCEPTED
+            return AgentResponse(
+                status="clarification_required",
+                thread_id=body.thread_id,
+                pending_action=pending
+            )
 
         if pending['kind'] == 'confirmation':
             response.status_code = status.HTTP_202_ACCEPTED

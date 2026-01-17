@@ -44,7 +44,19 @@ class PendingMCPElicitation(TypedDict):
     message: NotRequired[str]
 
 
-PendingAction = PendingApproval | PendingMCPElicitation
+class ClarificationInfo(TypedDict):
+    """Represents a single clarification request."""
+    call_id: str
+    question: str
+    context: NotRequired[str]
+
+
+class PendingClarification(TypedDict):
+    kind: Literal["clarification"]
+    clarifications: List[ClarificationInfo]
+
+
+PendingAction = PendingApproval | PendingMCPElicitation | PendingClarification
 
 
 class RequestState(MessagesState):

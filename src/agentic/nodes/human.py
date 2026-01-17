@@ -8,6 +8,7 @@ from agentic.state import RequestState, NO_ACTION
 from utils.helpers import get_last_ai_message
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.types import interrupt
+from mcp_module.adapter import HITL_TOOLS
 
 
 def create_tool_messages(call_ids: list[str], content: str | Callable[[str], str]) -> list[ToolMessage]:
@@ -132,8 +133,64 @@ async def human_confirmation(state: RequestState):
     )
 
 
-async def human_inquiry(state: RequestState):
-    pass
+async def human_clarification(state: RequestState):
+    """
+    Human-in-the-loop clarification node.
+
+    Interrupts execution to get user clarification when information is ambiguous.
+    Handles remaining tool calls after clarification is received.
+    """
+    pending = state['pending_action']
+    clarifications = pending['clarifications']
+    clarification_call_ids = {c['call_id'] for c in clarifications}
+
+    # interrupt and wait for user responses
+    result = interrupt(None)
+    # expected: {'responses': [{'call_id': '...', 'response': '...'}, ...]}
+    responses = result.get('responses', [])
+    response_map = {r['call_id']: r['response'] for r in responses}
+
+    # create ToolMessages for each clarification
+    clarification_msgs = [
+        ToolMessage(
+            content=f"User clarification: {response_map.get(c['call_id'], '')}",
+            tool_call_id=c['call_id']
+        )
+        for c in clarifications
+    ]
+
+    last_ai = get_last_ai_message(state)
+    remaining = [tc for tc in last_ai.tool_calls if tc['id'] not in clarification_call_ids]
+
+    # no remaining tools - return to task_executor
+    if not remaining:
+        return {'messages': clarification_msgs, 'pending_action': NO_ACTION}
+
+    # create dummy ToolMessages for deferred tools + new AIMessage
+    dummy_msgs = create_tool_messages(
+        [tc['id'] for tc in remaining],
+        "Deferred pending clarification."
+    )
+    new_ai = AIMessage(content=last_ai.content, tool_calls=remaining)
+
+    # check for HITL in remaining tools
+    hitl_remaining = [tc for tc in remaining if tc['name'] in HITL_TOOLS]
+    if hitl_remaining:
+        return {
+            'messages': clarification_msgs + dummy_msgs + [new_ai],
+            'pending_action': {
+                'kind': 'confirmation',
+                'tool_calls': [
+                    {'call_id': tc['id'], 'tool_name': tc['name'], 'arguments': tc['args']}
+                    for tc in hitl_remaining
+                ]
+            }
+        }
+
+    return {
+        'messages': clarification_msgs + dummy_msgs + [new_ai],
+        'pending_action': NO_ACTION
+    }
 
 
 async def oauth_needed(state: RequestState):
