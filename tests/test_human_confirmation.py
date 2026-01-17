@@ -8,6 +8,7 @@ from unittest.mock import patch
 from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 from agentic.nodes.human import human_confirmation
 from agentic.state import NO_ACTION
+from tests.conftest import MOCK_HITL_TOOL, MOCK_HITL_TOOL_2, MOCK_NON_HITL_TOOL
 
 
 def create_mock_state(tool_calls: list, pending_tool_calls: list) -> dict:
@@ -33,11 +34,11 @@ class TestMixedToolCalls:
     async def test_case1_all_approved_unchanged(self):
         """Case 1: All approved (no new messages)"""
         tool_calls = [
-            {'id': 'call_hitl_1', 'name': 'create_event', 'args': {'name': 'Test'}},
-            {'id': 'call_non_hitl_1', 'name': 'list_calendars', 'args': {}},
+            {'id': 'call_hitl_1', 'name': MOCK_HITL_TOOL, 'args': {'name': 'Test'}},
+            {'id': 'call_non_hitl_1', 'name': MOCK_NON_HITL_TOOL, 'args': {}},
         ]
         pending_tool_calls = [
-            {'call_id': 'call_hitl_1', 'tool_name': 'create_event', 'arguments': {'name': 'Test'}}
+            {'call_id': 'call_hitl_1', 'tool_name': MOCK_HITL_TOOL, 'arguments': {'name': 'Test'}}
         ]
         state = create_mock_state(tool_calls, pending_tool_calls)
 
@@ -54,12 +55,12 @@ class TestMixedToolCalls:
     async def test_case2_all_rejected_with_non_hitl(self):
         """Case 2: All HITL rejected, but non-HITL tools should still execute"""
         tool_calls = [
-            {'id': 'call_hitl_1', 'name': 'create_event', 'args': {'name': 'Test'}},
-            {'id': 'call_non_hitl_1', 'name': 'list_calendars', 'args': {}},
-            {'id': 'call_non_hitl_2', 'name': 'list_calendars', 'args': {}},
+            {'id': 'call_hitl_1', 'name': MOCK_HITL_TOOL, 'args': {'name': 'Test'}},
+            {'id': 'call_non_hitl_1', 'name': MOCK_NON_HITL_TOOL, 'args': {}},
+            {'id': 'call_non_hitl_2', 'name': MOCK_NON_HITL_TOOL, 'args': {}},
         ]
         pending_tool_calls = [
-            {'call_id': 'call_hitl_1', 'tool_name': 'create_event', 'arguments': {'name': 'Test'}}
+            {'call_id': 'call_hitl_1', 'tool_name': MOCK_HITL_TOOL, 'arguments': {'name': 'Test'}}
         ]
         state = create_mock_state(tool_calls, pending_tool_calls)
 
@@ -86,10 +87,10 @@ class TestMixedToolCalls:
     async def test_case2_all_rejected_no_non_hitl(self):
         """Case 2: All HITL rejected, no non-HITL tools"""
         tool_calls = [
-            {'id': 'call_hitl_1', 'name': 'create_event', 'args': {'name': 'Test'}},
+            {'id': 'call_hitl_1', 'name': MOCK_HITL_TOOL, 'args': {'name': 'Test'}},
         ]
         pending_tool_calls = [
-            {'call_id': 'call_hitl_1', 'tool_name': 'create_event', 'arguments': {'name': 'Test'}}
+            {'call_id': 'call_hitl_1', 'tool_name': MOCK_HITL_TOOL, 'arguments': {'name': 'Test'}}
         ]
         state = create_mock_state(tool_calls, pending_tool_calls)
 
@@ -110,13 +111,13 @@ class TestMixedToolCalls:
     async def test_case3_partial_with_non_hitl(self):
         """Case 3: Partial HITL approval with non-HITL tools."""
         tool_calls = [
-            {'id': 'call_hitl_1', 'name': 'create_event', 'args': {'name': 'Event 1'}},
-            {'id': 'call_hitl_2', 'name': 'update_event', 'args': {'name': 'Event 2'}},
-            {'id': 'call_non_hitl_1', 'name': 'list_calendars', 'args': {}},
+            {'id': 'call_hitl_1', 'name': MOCK_HITL_TOOL, 'args': {'name': 'Event 1'}},
+            {'id': 'call_hitl_2', 'name': MOCK_HITL_TOOL_2, 'args': {'name': 'Event 2'}},
+            {'id': 'call_non_hitl_1', 'name': MOCK_NON_HITL_TOOL, 'args': {}},
         ]
         pending_tool_calls = [
-            {'call_id': 'call_hitl_1', 'tool_name': 'create_event', 'arguments': {'name': 'Event 1'}},
-            {'call_id': 'call_hitl_2', 'tool_name': 'update_event', 'arguments': {'name': 'Event 2'}},
+            {'call_id': 'call_hitl_1', 'tool_name': MOCK_HITL_TOOL, 'arguments': {'name': 'Event 1'}},
+            {'call_id': 'call_hitl_2', 'tool_name': MOCK_HITL_TOOL_2, 'arguments': {'name': 'Event 2'}},
         ]
         state = create_mock_state(tool_calls, pending_tool_calls)
 

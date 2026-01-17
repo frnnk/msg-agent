@@ -8,6 +8,7 @@ from unittest.mock import patch
 from langchain_core.messages import AIMessage, ToolMessage, HumanMessage
 from agentic.nodes.human import human_clarification
 from agentic.state import NO_ACTION
+from tests.conftest import MOCK_HITL_TOOL, MOCK_NON_HITL_TOOL
 
 
 def create_mock_state(tool_calls: list, pending_clarifications: list) -> dict:
@@ -89,7 +90,7 @@ class TestClarificationWithNonHITL:
         """Clarification + non-HITL tools should route to use_tools."""
         tool_calls = [
             {'id': 'call_clarify_1', 'name': 'request_clarification', 'args': {'question': 'What time?'}},
-            {'id': 'call_non_hitl_1', 'name': 'list_calendars', 'args': {}}
+            {'id': 'call_non_hitl_1', 'name': MOCK_NON_HITL_TOOL, 'args': {}}
         ]
         pending_clarifications = [
             {'call_id': 'call_clarify_1', 'question': 'What time?', 'context': ''}
@@ -109,7 +110,7 @@ class TestClarificationWithNonHITL:
         # should have new AIMessage with remaining tools
         assert len(ai_messages) == 1
         assert len(ai_messages[0].tool_calls) == 1
-        assert ai_messages[0].tool_calls[0]['name'] == 'list_calendars'
+        assert ai_messages[0].tool_calls[0]['name'] == MOCK_NON_HITL_TOOL
         # should return to use_tools (no confirmation pending)
         assert result['pending_action'] == NO_ACTION
 
@@ -122,7 +123,7 @@ class TestClarificationWithHITL:
         """Clarification + HITL tools should route to human_confirmation."""
         tool_calls = [
             {'id': 'call_clarify_1', 'name': 'request_clarification', 'args': {'question': 'What time?'}},
-            {'id': 'call_hitl_1', 'name': 'create_event', 'args': {'name': 'Meeting'}}
+            {'id': 'call_hitl_1', 'name': MOCK_HITL_TOOL, 'args': {'name': 'Meeting'}}
         ]
         pending_clarifications = [
             {'call_id': 'call_clarify_1', 'question': 'What time?', 'context': ''}
@@ -137,11 +138,11 @@ class TestClarificationWithHITL:
         ai_messages = [m for m in messages if isinstance(m, AIMessage)]
 
         assert len(ai_messages) == 1
-        assert ai_messages[0].tool_calls[0]['name'] == 'create_event'
+        assert ai_messages[0].tool_calls[0]['name'] == MOCK_HITL_TOOL
         # should route to human_confirmation
         assert result['pending_action']['kind'] == 'confirmation'
         assert len(result['pending_action']['tool_calls']) == 1
-        assert result['pending_action']['tool_calls'][0]['tool_name'] == 'create_event'
+        assert result['pending_action']['tool_calls'][0]['tool_name'] == MOCK_HITL_TOOL
 
 
 class TestClarificationWithMixedTools:
@@ -152,8 +153,8 @@ class TestClarificationWithMixedTools:
         """Clarification + HITL + non-HITL tools should route to human_confirmation."""
         tool_calls = [
             {'id': 'call_clarify_1', 'name': 'request_clarification', 'args': {'question': 'What time?'}},
-            {'id': 'call_hitl_1', 'name': 'create_event', 'args': {'name': 'Meeting'}},
-            {'id': 'call_non_hitl_1', 'name': 'list_calendars', 'args': {}}
+            {'id': 'call_hitl_1', 'name': MOCK_HITL_TOOL, 'args': {'name': 'Meeting'}},
+            {'id': 'call_non_hitl_1', 'name': MOCK_NON_HITL_TOOL, 'args': {}}
         ]
         pending_clarifications = [
             {'call_id': 'call_clarify_1', 'question': 'What time?', 'context': ''}
@@ -170,12 +171,12 @@ class TestClarificationWithMixedTools:
         # new AIMessage should have both HITL and non-HITL tools
         assert len(ai_messages) == 1
         tool_names = {tc['name'] for tc in ai_messages[0].tool_calls}
-        assert tool_names == {'create_event', 'list_calendars'}
+        assert tool_names == {MOCK_HITL_TOOL, MOCK_NON_HITL_TOOL}
 
         # pending_action should only have HITL tools for confirmation
         assert result['pending_action']['kind'] == 'confirmation'
         assert len(result['pending_action']['tool_calls']) == 1
-        assert result['pending_action']['tool_calls'][0]['tool_name'] == 'create_event'
+        assert result['pending_action']['tool_calls'][0]['tool_name'] == MOCK_HITL_TOOL
 
 
 if __name__ == '__main__':
