@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage, HumanMessage
 from agentic.state import RequestState, NO_ACTION
-from agentic.schema.prompts import POLICY_ROUTER, get_task_executor_prompt, RESPONSE_FORMATTER
+from agentic.schema.prompts import POLICY_ROUTER, get_task_executor_prompt
 from agentic.schema.models import PolicyRouterOut
 from mcp_module.adapter import TOOL_MAPPING, HITL_TOOLS, CLIENT
 
@@ -99,36 +99,14 @@ async def task_executor(state: RequestState):
             }
         }
 
+    if not message.tool_calls:
+        return {
+            'messages': message,
+            'final_response': message.content
+        }
+
     return {
         'messages': message
-    }
-
-async def response_formatter(state: RequestState):
-    """
-    Response formatter node.
-
-    Produces the final user-facing message by summarizing the conversation and
-    tool results. Handles OAuth URL elicitation by returning the auth message directly.
-
-    Returns final_response to state for the API to return to the client.
-    """
-    pending_action = state.get('pending_action', NO_ACTION)
-    if pending_action['kind'] == 'oauth_url':
-        return {
-            'final_response': pending_action['message']
-        }
-    logging.debug(f"Current Messages: {state['messages']}")
-
-    final_response = await model.ainvoke(
-        [
-            SystemMessage(content=RESPONSE_FORMATTER)
-        ]
-        + state['messages']
-    )
-    logging.info(f"Final response: {final_response.content}")
-
-    return {
-        'final_response': final_response.content
     }
 
 if __name__ == '__main__':

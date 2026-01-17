@@ -11,16 +11,16 @@ flowchart TD
 
     task_executor -->|HITL tools| human_confirmation
     task_executor -->|tool calls| use_tools
-    task_executor -->|no tool calls| response_formatter
+    task_executor -->|no tool calls| END
 
     human_confirmation[["human_confirmation<br/>(interrupt)"]]
     human_confirmation -->|approved| use_tools
     human_confirmation -->|all rejected| task_executor
 
-    use_tools -->|OAuth URL| response_formatter
+    use_tools -->|OAuth URL| oauth_needed
     use_tools -->|continue| task_executor
 
-    response_formatter --> END((END))
+    oauth_needed --> END((END))
 ```
 
 ### Nodes
@@ -28,10 +28,10 @@ flowchart TD
 | Node | Purpose |
 |------|---------|
 | `policy_router` | Evaluates user request and determines which tool types (calendar, maps) are allowed |
-| `task_executor` | Main agent loop - makes tool calls, handles clarifying questions |
+| `task_executor` | Main agent loop - makes tool calls, handles clarifying questions, produces final response |
 | `use_tools` | Executes MCP tool calls via LangGraph ToolNode |
 | `human_confirmation` | Human-in-the-loop node for tools requiring user approval (handles mixed HITL/non-HITL tool calls) |
-| `response_formatter` | Produces final user-facing message |
+| `oauth_needed` | Handles OAuth URL responses by setting final_response |
 
 ### Conditional Edges
 
@@ -39,8 +39,8 @@ flowchart TD
 |------|------|-----------|-----------|
 | `route_from_task_executor` | task_executor | human_confirmation | If HITL tools detected |
 | `route_from_task_executor` | task_executor | use_tools | If tool_calls present |
-| `route_from_task_executor` | task_executor | response_formatter | If no tool_calls |
-| `oauth_url_detection` | use_tools | response_formatter | If OAuth URL detected |
+| `route_from_task_executor` | task_executor | END | If no tool_calls |
+| `oauth_url_detection` | use_tools | oauth_needed | If OAuth URL detected |
 | `oauth_url_detection` | use_tools | task_executor | Otherwise (continue loop) |
 | `route_from_human_confirmation` | human_confirmation | use_tools | If any tools approved |
 | `route_from_human_confirmation` | human_confirmation | task_executor | If all rejected |
@@ -68,9 +68,9 @@ msg-agent/
     │   ├── edges.py           # Conditional routing logic
     │   │
     │   ├── nodes/
-    │   │   ├── agent.py       # policy_router, task_executor, response_formatter
+    │   │   ├── agent.py       # policy_router, task_executor
     │   │   ├── tool.py        # use_tools node (MCP tool execution)
-    │   │   └── human.py       # Human-in-the-loop nodes (supports mixed HITL/non-HITL tools)
+    │   │   └── human.py       # human_confirmation, oauth_needed
     │   │
     │   └── schema/
     │       ├── prompts.py     # Agent system prompts
@@ -282,9 +282,9 @@ Tools in `HITL_TOOLS` (`create_event`, `update_event`) require user confirmation
 7. /resume with approvals
    ↓
 8. human_confirmation processes approvals:
-   - All approved → use_tools → execute → response_formatter
+   - All approved → use_tools → execute → task_executor → END
    - All rejected → task_executor (with feedback) → may retry
-   - Partial → use_tools (approved only) → task_executor (feedback) → response_formatter
+   - Partial → use_tools (approved only) → task_executor (feedback) → END
 ```
 
 ### Approval Scenarios

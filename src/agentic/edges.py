@@ -19,15 +19,15 @@ def route_from_task_executor(state: RequestState):
         logging.info(f"Routing from Task Executor to use_tools")
         return "use_tools"
 
-    logging.info(f"Routing from Task Executor to response_formatter")
-    return "response_formatter"
+    logging.info(f"Routing from Task Executor to END")
+    return END
 
 
 def oauth_url_detection(state: RequestState):
-    """Route to response_formatter if URL OAuth is detected, otherwise continue to task executor"""
+    """Route to oauth_needed if URL OAuth is detected, otherwise continue to task executor"""
     if state.get('pending_action', NO_ACTION)['kind'] == 'oauth_url':
-        logging.info(f"Routing from Tool Node to response_formatter")
-        return "response_formatter"
+        logging.info(f"Routing from Tool Node to oauth_needed")
+        return "oauth_needed"
 
     logging.info(f"Routing from Tool node back to Task Executor")
     return "task_executor"

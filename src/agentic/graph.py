@@ -8,9 +8,9 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain.messages import HumanMessage
 from agentic.state import RequestState
-from agentic.nodes.agent import policy_router, task_executor, response_formatter
+from agentic.nodes.agent import policy_router, task_executor
 from agentic.nodes.tool import use_tools
-from agentic.nodes.human import human_confirmation, human_inquiry
+from agentic.nodes.human import human_confirmation, human_inquiry, oauth_needed
 from agentic.edges import route_from_task_executor, oauth_url_detection, route_from_human_confirmation
 
 
@@ -18,9 +18,9 @@ from agentic.edges import route_from_task_executor, oauth_url_detection, route_f
 graph_config = StateGraph(state_schema=RequestState)
 graph_config.add_node("policy_router", policy_router)
 graph_config.add_node("task_executor", task_executor)
-graph_config.add_node("response_formatter", response_formatter)
 graph_config.add_node("use_tools", use_tools)
 graph_config.add_node("human_confirmation", human_confirmation)
+graph_config.add_node("oauth_needed", oauth_needed)
 
 # conditional edges use a function to dynamically route
 graph_config.add_edge(START, "policy_router")
@@ -28,19 +28,19 @@ graph_config.add_edge("policy_router", "task_executor")
 graph_config.add_conditional_edges(
     "task_executor",
     route_from_task_executor,
-    ["use_tools", "response_formatter", "human_confirmation"]
+    ["use_tools", "human_confirmation", END]
 )
 graph_config.add_conditional_edges(
     "use_tools",
     oauth_url_detection,
-    ["task_executor", "response_formatter"]
+    ["task_executor", "oauth_needed"]
 )
 graph_config.add_conditional_edges(
     "human_confirmation",
     route_from_human_confirmation,
     ["use_tools", "task_executor"]
 )
-graph_config.add_edge("response_formatter", END)
+graph_config.add_edge("oauth_needed", END)
 
 # set up a local memory checkpointer for now, volatile and not persistent
 memory = InMemorySaver()

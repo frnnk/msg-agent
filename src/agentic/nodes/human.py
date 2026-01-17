@@ -134,3 +134,10 @@ async def human_confirmation(state: RequestState):
 
 async def human_inquiry(state: RequestState):
     pass
+
+
+async def oauth_needed(state: RequestState):
+    pending_action = state.get('pending_action', NO_ACTION)
+    return {
+        'final_response': pending_action.get('message', 'Authentication required.')
+    }
