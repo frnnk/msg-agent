@@ -68,10 +68,14 @@ msg-agent/
 ├── README.md
 │
 ├── tests/
-│   ├── conftest.py                 # Pytest fixtures, mock HITL_TOOLS
+│   ├── conftest.py                 # Pytest fixtures, mock tools and mappings
 │   ├── client.py                   # Interactive REPL test client
-│   ├── test_human_confirmation.py  # Unit tests for HITL confirmation
-│   └── test_human_clarification.py # Unit tests for clarification flow
+│   ├── benchmark/                  # Speed benchmark tests
+│   │   ├── test_policy_router_speed.py
+│   │   └── test_task_executor_speed.py
+│   └── unit/                       # Unit tests
+│       ├── test_human_confirmation.py
+│       └── test_human_clarification.py
 │
 └── src/
     ├── main.py                # FastAPI entry point
@@ -449,7 +453,38 @@ uv run pytest tests/ -v
 
 ### Test Architecture
 
-Tests are decoupled from the actual `HITL_TOOLS` set via mock constants defined in `conftest.py`. An autouse fixture patches `HITL_TOOLS` in the human module, so tests use mock tool names (`mock_hitl_tool`, `mock_non_hitl_tool`) instead of real ones (`create_event`, `list_calendars`). This prevents tests from breaking when `HITL_TOOLS` changes.
+Tests are fully decoupled from src definitions via mock constants and fixtures in `conftest.py`:
+
+**Mock Tool Mapping:**
+```python
+MOCK_TOOL_MAPPING = {
+    'calendar': ['mock_list_calendars', 'mock_list_events', 'mock_create_event', 'mock_update_event'],
+    'maps': ['mock_search_places', 'mock_get_directions'],
+}
+
+MOCK_HITL_TOOLS = {'mock_create_event', 'mock_update_event'}
+```
+
+**Mock Tools:**
+| Tool | Type | Description |
+|------|------|-------------|
+| `mock_list_calendars` | calendar | Returns mock calendar list |
+| `mock_list_events` | calendar | Returns mock events |
+| `mock_create_event` | calendar, HITL | Returns created event |
+| `mock_update_event` | calendar, HITL | Returns updated event |
+| `mock_search_places` | maps | Returns mock places |
+| `mock_get_directions` | maps | Returns mock directions |
+
+**Fixtures:**
+| Fixture | Scope | Purpose |
+|---------|-------|---------|
+| `patch_hitl_tools` | autouse | Patches `HITL_TOOLS` in human module |
+| `patch_tool_mapping` | autouse | Patches `TOOL_MAPPING` in agent.py and prompts.py |
+| `mock_mcp_client` | manual | Patches `CLIENT.get_tools` to return mock tools |
+| `timing_threshold` | manual | Returns speed thresholds for benchmark tests |
+| `verify_api_key` | manual | Skips test if no API key available |
+
+This ensures tests don't break when `TOOL_MAPPING` or `HITL_TOOLS` in `mcp_module/adapter.py` changes.
 
 ## Testing Flows
 
