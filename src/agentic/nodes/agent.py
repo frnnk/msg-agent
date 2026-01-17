@@ -6,7 +6,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain.messages import SystemMessage, HumanMessage
+from langchain.messages import SystemMessage
 from agentic.state import RequestState, NO_ACTION
 from agentic.schema.prompts import POLICY_ROUTER, get_task_executor_prompt
 from agentic.schema.models import PolicyRouterOut

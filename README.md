@@ -68,6 +68,7 @@ msg-agent/
 ├── README.md
 │
 ├── tests/
+│   ├── conftest.py                 # Pytest fixtures, mock HITL_TOOLS
 │   ├── client.py                   # Interactive REPL test client
 │   ├── test_human_confirmation.py  # Unit tests for HITL confirmation
 │   └── test_human_clarification.py # Unit tests for clarification flow
@@ -445,6 +446,10 @@ Run the unit tests with pytest:
 ```bash
 uv run pytest tests/ -v
 ```
+
+### Test Architecture
+
+Tests are decoupled from the actual `HITL_TOOLS` set via mock constants defined in `conftest.py`. An autouse fixture patches `HITL_TOOLS` in the human module, so tests use mock tool names (`mock_hitl_tool`, `mock_non_hitl_tool`) instead of real ones (`create_event`, `list_calendars`). This prevents tests from breaking when `HITL_TOOLS` changes.
 
 ## Testing Flows
 
