@@ -2,30 +2,14 @@
 Implementation of several agent nodes within the message assistant agentic system.
 """
 
-import os
 import logging
-from dotenv import load_dotenv
-from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage
 from agentic.state import RequestState, NO_ACTION
+from agentic.config import POLICY_ROUTER_MODEL, TASK_EXECUTOR_MODEL
 from agentic.schema.prompts import POLICY_ROUTER, get_task_executor_prompt
 from agentic.schema.models import PolicyRouterOut
 from agentic.schema.tools import request_clarification, CLARIFICATION_TOOL_NAME
 from mcp_module.adapter import TOOL_MAPPING, HITL_TOOLS, CLIENT
-
-load_dotenv()
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-os.environ['GOOGLE_API_KEY'] = GOOGLE_API_KEY
-os.environ['OPENAI_API_KEY'] = OPENAI_API_KEY
-
-GEMINI_MODEL = 'google_genai:gemini-2.5-flash-lite'
-GPT_MODEL = 'openai:gpt-5-nano'
-
-model = init_chat_model(
-    model=GPT_MODEL,
-    temperature=0
-)
 
 async def policy_router(state: RequestState):
     """
@@ -36,7 +20,7 @@ async def policy_router(state: RequestState):
 
     Uses structured output to ensure consistent policy decisions.
     """
-    structured_model = model.with_structured_output(PolicyRouterOut)
+    structured_model = POLICY_ROUTER_MODEL.with_structured_output(PolicyRouterOut)
     message = await structured_model.ainvoke(
         [
             SystemMessage(
@@ -69,7 +53,7 @@ async def task_executor(state: RequestState):
 
     logging.info(f"Task allowed tools: {allowed_tools}")
 
-    tool_model = model.bind_tools(tools=tools)
+    tool_model = TASK_EXECUTOR_MODEL.bind_tools(tools=tools)
     message = await tool_model.ainvoke(
         [
             SystemMessage(
