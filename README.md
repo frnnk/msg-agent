@@ -9,9 +9,15 @@ flowchart TD
     START((START)) --> policy_router
     policy_router --> task_executor
 
+    task_executor -->|clarification needed| human_clarification
     task_executor -->|HITL tools| human_confirmation
     task_executor -->|tool calls| use_tools
     task_executor -->|no tool calls| END
+
+    human_clarification[["human_clarification<br/>(interrupt)"]]
+    human_clarification -->|HITL remaining| human_confirmation
+    human_clarification -->|tools remaining| use_tools
+    human_clarification -->|no remaining| task_executor
 
     human_confirmation[["human_confirmation<br/>(interrupt)"]]
     human_confirmation -->|approved| use_tools
@@ -28,8 +34,9 @@ flowchart TD
 | Node | Purpose |
 |------|---------|
 | `policy_router` | Evaluates user request and determines which tool types (calendar, maps) are allowed |
-| `task_executor` | Main agent loop - makes tool calls, handles clarifying questions, produces final response |
+| `task_executor` | Main agent loop - makes tool calls, requests clarifications, produces final response |
 | `use_tools` | Executes MCP tool calls via LangGraph ToolNode |
+| `human_clarification` | Human-in-the-loop node for clarification requests when info is ambiguous |
 | `human_confirmation` | Human-in-the-loop node for tools requiring user approval (handles mixed HITL/non-HITL tool calls) |
 | `oauth_needed` | Handles OAuth URL responses by setting final_response |
 
@@ -37,11 +44,15 @@ flowchart TD
 
 | Edge | From | Routes To | Condition |
 |------|------|-----------|-----------|
+| `route_from_task_executor` | task_executor | human_clarification | If clarification tools detected (priority) |
 | `route_from_task_executor` | task_executor | human_confirmation | If HITL tools detected |
 | `route_from_task_executor` | task_executor | use_tools | If tool_calls present |
 | `route_from_task_executor` | task_executor | END | If no tool_calls |
 | `oauth_url_detection` | use_tools | oauth_needed | If OAuth URL detected |
 | `oauth_url_detection` | use_tools | task_executor | Otherwise (continue loop) |
+| `route_from_human_clarification` | human_clarification | human_confirmation | If HITL tools remain |
+| `route_from_human_clarification` | human_clarification | use_tools | If non-HITL tools remain |
+| `route_from_human_clarification` | human_clarification | task_executor | If no tools remain |
 | `route_from_human_confirmation` | human_confirmation | use_tools | If any tools approved |
 | `route_from_human_confirmation` | human_confirmation | task_executor | If all rejected |
 
@@ -57,7 +68,9 @@ msg-agent/
 ├── README.md
 │
 ├── tests/
-│   └── test_human_confirmation.py  # Unit tests for mixed HITL/non-HITL tool handling
+│   ├── client.py                   # Interactive REPL test client
+│   ├── test_human_confirmation.py  # Unit tests for HITL confirmation
+│   └── test_human_clarification.py # Unit tests for clarification flow
 │
 └── src/
     ├── main.py                # FastAPI entry point
@@ -70,11 +83,12 @@ msg-agent/
     │   ├── nodes/
     │   │   ├── agent.py       # policy_router, task_executor
     │   │   ├── tool.py        # use_tools node (MCP tool execution)
-    │   │   └── human.py       # human_confirmation, oauth_needed
+    │   │   └── human.py       # human_confirmation, human_clarification, oauth_needed
     │   │
     │   └── schema/
     │       ├── prompts.py     # Agent system prompts
-    │       └── models.py      # Pydantic models for structured outputs
+    │       ├── models.py      # Pydantic models for structured outputs
+    │       └── tools.py       # LangChain tools (request_clarification)
     │
     ├── mcp_module/
     │   └── adapter.py         # MCP client setup, TOOL_MAPPING
@@ -147,6 +161,24 @@ curl -X POST http://127.0.0.1:8002/run \
 }
 ```
 
+**Response (clarification required):**
+```json
+{
+  "status": "clarification_required",
+  "thread_id": "any-string",
+  "pending_action": {
+    "kind": "clarification",
+    "clarifications": [
+      {
+        "call_id": "call_abc123",
+        "question": "What would you like to schedule?",
+        "context": "Scheduling on the primary calendar."
+      }
+    ]
+  }
+}
+```
+
 **Response (HITL confirmation required):**
 ```json
 {
@@ -172,9 +204,21 @@ curl -X POST http://127.0.0.1:8002/run \
 
 ### POST /resume
 
-Resume a paused graph execution after human confirmation.
+Resume a paused graph execution after human clarification or confirmation.
 
-**Request:**
+**Request (for clarification):**
+```bash
+curl -X POST http://127.0.0.1:8002/resume \
+  -H "Content-Type: application/json" \
+  -d '{
+    "thread_id": "any-string",
+    "clarification_responses": [
+      {"call_id": "call_abc123", "response": "a meeting tomorrow at 3pm"}
+    ]
+  }'
+```
+
+**Request (for confirmation):**
 ```bash
 curl -X POST http://127.0.0.1:8002/resume \
   -H "Content-Type: application/json" \
@@ -191,10 +235,15 @@ curl -X POST http://127.0.0.1:8002/resume \
 | Field | Type | Description |
 |-------|------|-------------|
 | `thread_id` | string | Same thread_id from the /run response |
-| `approvals` | array | List of approval decisions for each tool call |
+| `clarification_responses` | array? | List of responses to clarification questions |
+| `clarification_responses[].call_id` | string | The call_id from pending_action.clarifications |
+| `clarification_responses[].response` | string | User's response to the clarification question |
+| `approvals` | array? | List of approval decisions for tool calls |
 | `approvals[].call_id` | string | The call_id from pending_action.tool_calls |
 | `approvals[].approved` | boolean | Whether to approve this tool call |
 | `approvals[].feedback` | string? | Optional feedback (required if rejected) |
+
+*Note: Provide either `clarification_responses` or `approvals`, not both.*
 
 **Response:**
 ```json
@@ -230,7 +279,7 @@ HITL_TOOLS = {'create_event', 'update_event'}
 ```python
 class RequestState(MessagesState):
     allowed_tool_types: list[str]              # From policy_router
-    pending_action: NotRequired[PendingAction] # OAuth, form elicitation, or confirmation
+    pending_action: NotRequired[PendingAction] # OAuth, clarification, or confirmation
     final_response: NotRequired[str]           # Final message to user
     approval_outcome: NotRequired[ApprovalOutcome]  # Result of HITL approval
 
@@ -238,6 +287,11 @@ class ToolCallInfo(TypedDict):
     call_id: str              # Unique ID from AIMessage.tool_calls[].id
     tool_name: str
     arguments: dict[str, Any]
+
+class ClarificationInfo(TypedDict):
+    call_id: str
+    question: str
+    context: NotRequired[str]
 
 class RejectedToolFeedback(TypedDict):
     call_id: str
@@ -252,13 +306,80 @@ class ApprovalOutcome(TypedDict):
 class PendingApproval(TypedDict):
     kind: Literal["confirmation"]
     tool_calls: List[ToolCallInfo]
+
+class PendingClarification(TypedDict):
+    kind: Literal["clarification"]
+    clarifications: List[ClarificationInfo]
 ```
 
 ### pending_action.kind Values
+- `"clarification"` - Agent needs user clarification
+- `"confirmation"` - Human-in-the-loop confirmation for HITL tools
 - `"oauth_url"` - OAuth URL elicitation flow
 - `"form_elicitation"` - Form-based elicitation flow
-- `"confirmation"` - Human-in-the-loop confirmation
 - `"no_action_needed"` - Default
+
+## Human Clarification Flow
+
+When the agent needs more information from the user (e.g., ambiguous request like "schedule something"), it uses the `request_clarification` tool.
+
+### Flow Diagram
+
+```
+1. /run request with ambiguous info
+   ↓
+2. task_executor calls request_clarification tool
+   ↓
+3. Sets pending_action.kind = "clarification"
+   ↓
+4. Routes to human_clarification node
+   ↓
+5. interrupt() pauses graph, returns 202 to client
+   ↓
+6. Client displays clarification questions
+   ↓
+7. /resume with clarification_responses
+   ↓
+8. human_clarification processes responses:
+   - If HITL tools remain → human_confirmation
+   - If non-HITL tools remain → use_tools
+   - If no tools remain → task_executor
+```
+
+### Clarification with Mixed Tools
+
+When the agent calls both `request_clarification` and other tools (HITL or non-HITL) in the same message:
+
+1. Clarification is processed **first** (priority over HITL)
+2. Other tools are deferred with dummy ToolMessages
+3. After clarification, a new AIMessage is created with remaining tools
+4. If remaining tools include HITL → routes to human_confirmation
+5. If remaining tools are non-HITL only → routes to use_tools
+
+### Example: Complex Flow
+
+```
+User: "schedule something for me, and move the meeting at 3pm to 4pm"
+    ↓
+Agent calls: [request_clarification, update_event]
+    ↓
+clarification_required (priority)
+    Question: "What would you like to schedule?"
+    ↓
+User provides: "a dentist appointment on Friday at 10am"
+    ↓
+confirmation_required (deferred update_event)
+    Tool: update_event (move meeting to 4pm)
+    ↓
+User: approved
+    ↓
+confirmation_required (new create_event from clarification)
+    Tool: create_event (Dentist Appointment)
+    ↓
+User: approved
+    ↓
+success: Both actions completed
+```
 
 ## Human-in-the-Loop (HITL) Flow
 
@@ -332,7 +453,32 @@ Start the server:
 uv run uvicorn src.main:app --port 8002
 ```
 
-### Test 1: Direct Approval
+### Test 1: Clarification Flow
+
+```bash
+# Step 1: Ambiguous request
+curl -X POST http://127.0.0.1:8002/run \
+  -H "Content-Type: application/json" \
+  -d '{"thread_id": "test-clarify", "user_request": "schedule something"}'
+
+# Response: clarification_required with call_id and question
+
+# Step 2: Provide clarification
+curl -X POST http://127.0.0.1:8002/resume \
+  -H "Content-Type: application/json" \
+  -d '{"thread_id": "test-clarify", "clarification_responses": [{"call_id": "<call_id>", "response": "a meeting tomorrow at 3pm"}]}'
+
+# Response: confirmation_required for create_event
+
+# Step 3: Approve
+curl -X POST http://127.0.0.1:8002/resume \
+  -H "Content-Type: application/json" \
+  -d '{"thread_id": "test-clarify", "approvals": [{"call_id": "<call_id>", "approved": true}]}'
+
+# Response: success with event created
+```
+
+### Test 2: Direct Approval
 
 ```bash
 # Step 1: Create event request
