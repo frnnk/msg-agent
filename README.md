@@ -443,13 +443,16 @@ When some tools are approved and others rejected, the message sequence must sati
 7. ToolMessage for non_HITL_C (actual execution result)
 ```
 
-## Unit Tests
+## Testing
 
-Run the unit tests with pytest:
+Run all tests in parallel:
 
 ```bash
-uv run pytest tests/ -v
+uv run pytest tests/ -n auto -v
 ```
+
+- `-n auto` uses all available CPU cores
+- `-n 4` uses 4 workers (specify manually)
 
 ### Test Architecture
 
