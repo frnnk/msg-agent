@@ -131,5 +131,6 @@ async def human_confirmation(state: RequestState):
         rejected
     )
 
+
 async def human_inquiry(state: RequestState):
     pass

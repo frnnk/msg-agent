@@ -30,7 +30,7 @@ flowchart TD
 | `policy_router` | Evaluates user request and determines which tool types (calendar, maps) are allowed |
 | `task_executor` | Main agent loop - makes tool calls, handles clarifying questions |
 | `use_tools` | Executes MCP tool calls via LangGraph ToolNode |
-| `human_confirmation` | Human-in-the-loop node for tools requiring user approval |
+| `human_confirmation` | Human-in-the-loop node for tools requiring user approval (handles mixed HITL/non-HITL tool calls) |
 | `response_formatter` | Produces final user-facing message |
 
 ### Conditional Edges
@@ -56,6 +56,9 @@ msg-agent/
 ├── uv.lock                    # Dependency lock file
 ├── README.md
 │
+├── tests/
+│   └── test_human_confirmation.py  # Unit tests for mixed HITL/non-HITL tool handling
+│
 └── src/
     ├── main.py                # FastAPI entry point
     │
@@ -67,7 +70,7 @@ msg-agent/
     │   ├── nodes/
     │   │   ├── agent.py       # policy_router, task_executor, response_formatter
     │   │   ├── tool.py        # use_tools node (MCP tool execution)
-    │   │   └── human.py       # Human-in-the-loop nodes
+    │   │   └── human.py       # Human-in-the-loop nodes (supports mixed HITL/non-HITL tools)
     │   │
     │   └── schema/
     │       ├── prompts.py     # Agent system prompts
@@ -288,21 +291,38 @@ Tools in `HITL_TOOLS` (`create_event`, `update_event`) require user confirmation
 
 | Scenario | Behavior |
 |----------|----------|
-| **All approved** | Tools execute, returns success response |
-| **All rejected** | Feedback sent to task_executor, agent may propose alternatives |
-| **Partial** | Approved tools execute, rejected feedback sent to agent |
+| **All HITL approved** | All tools execute (HITL + non-HITL), returns success response |
+| **All HITL rejected (no non-HITL)** | Feedback sent to task_executor, agent may propose alternatives |
+| **All HITL rejected (with non-HITL)** | Non-HITL tools execute, feedback sent to agent |
+| **Partial HITL approval** | Approved HITL + all non-HITL tools execute, rejected feedback sent to agent |
 
-### Message Sequence (Partial Approval)
+### Mixed Tool Handling
+
+When an AIMessage contains both HITL tools (e.g., `create_event`) and non-HITL tools (e.g., `list_calendars`):
+- Non-HITL tools are **auto-approved** and always included in execution
+- Only HITL tools require user confirmation
+- If all HITL tools are rejected, non-HITL tools still execute via a new AIMessage
+
+### Message Sequence (Partial Approval with Mixed Tools)
 
 When some tools are approved and others rejected, the message sequence must satisfy the API requirement that every `tool_call` has a corresponding `ToolMessage`:
 
 ```
-1. AIMessage with tool_calls [A, B, C]
-2. ToolMessage for A (approved placeholder)
-3. ToolMessage for B (rejected with feedback)
-4. ToolMessage for C (rejected with feedback)
-5. New AIMessage with tool_calls [A] only
-6. ToolMessage for A (actual execution result)
+1. AIMessage with tool_calls [HITL_A, HITL_B, non_HITL_C]
+2. ToolMessage for HITL_A (approved placeholder)
+3. ToolMessage for HITL_B (rejected with feedback)
+4. ToolMessage for non_HITL_C (auto-approved placeholder)
+5. New AIMessage with tool_calls [HITL_A, non_HITL_C]
+6. ToolMessage for HITL_A (actual execution result)
+7. ToolMessage for non_HITL_C (actual execution result)
+```
+
+## Unit Tests
+
+Run the unit tests with pytest:
+
+```bash
+uv run pytest tests/ -v
 ```
 
 ## Testing Flows
