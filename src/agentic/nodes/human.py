@@ -3,10 +3,38 @@ Implementation of several HITL nodes within the message assistant agentic system
 confirmations, form elicitations, and url oauth elicitations.
 """
 
+from typing import Callable
 from agentic.state import RequestState, NO_ACTION
 from utils.helpers import get_last_ai_message
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.types import interrupt
+
+
+def create_tool_messages(call_ids: list[str], content: str | Callable[[str], str]) -> list[ToolMessage]:
+    """Create ToolMessages for given call IDs with specified content."""
+    if callable(content):
+        return [ToolMessage(content=content(cid), tool_call_id=cid) for cid in call_ids]
+    return [ToolMessage(content=content, tool_call_id=cid) for cid in call_ids]
+
+
+def build_confirmation_result(
+    messages: list | None,
+    all_approved: bool,
+    approved_call_ids: list[str],
+    rejected_feedback: list
+) -> dict:
+    """Build the return dict for human_confirmation node."""
+    result = {
+        'pending_action': NO_ACTION,
+        'approval_outcome': {
+            'all_approved': all_approved,
+            'approved_call_ids': approved_call_ids,
+            'rejected_feedback': rejected_feedback
+        }
+    }
+    if messages:
+        result['messages'] = messages
+    return result
 
 
 async def human_confirmation(state: RequestState):
@@ -24,7 +52,6 @@ async def human_confirmation(state: RequestState):
     # requires at least one argument (the value is not used, we use pending_action instead)
     approval_results = interrupt(None)
 
-    # format of approval_results is found in (from /resume endpoint):
     approved_ids = [r['call_id'] for r in approval_results if r.get('approved')]
     rejected = [
         {
@@ -37,77 +64,72 @@ async def human_confirmation(state: RequestState):
 
     last_ai_message = get_last_ai_message(state)
 
+    # get non-HITL tools that are auto-approved
+    hitl_call_ids = {tc['call_id'] for tc in tool_calls}
+    non_hitl_tool_calls = [tc for tc in last_ai_message.tool_calls if tc['id'] not in hitl_call_ids]
+    non_hitl_call_ids = [tc['id'] for tc in non_hitl_tool_calls]
+
+    # create filler ToolMessages (in preparation for creating a new filtered AIMessage)
+    rejected_feedback_map = {r['call_id']: r['feedback'] for r in rejected}
+    approved_tool_msgs = create_tool_messages(
+        approved_ids,
+        "User approved this action. Proceeding with execution."
+    )
+    rejected_tool_msgs = create_tool_messages(
+        [r['call_id'] for r in rejected],
+        lambda cid: f"User rejected this action: {rejected_feedback_map[cid]}"
+    )
+    non_hitl_tool_msgs = create_tool_messages(
+        non_hitl_call_ids,
+        "Auto-approved (non-confirmation tool). Proceeding with execution."
+    )
+
     # case 1: all approved, don't add any messages, just route to use_tools
     # the use_tools node will execute the tools and add ToolMessage responses
-    # note: adding a HumanMessage here would break the message sequence since
-    # AIMessage with tool_calls must be followed by ToolMessage, not HumanMessage
     if len(rejected) == 0:
-        return {
-            'pending_action': NO_ACTION,
-            'approval_outcome': {
-                'all_approved': True,
-                'approved_call_ids': approved_ids,
-                'rejected_feedback': []
-            }
-        }
+        return build_confirmation_result(None, True, approved_ids, [])
 
-    # case 2: all rejected, add ToolMessages for rejected calls, then route to task_executor
-    # every tool_call called by AIMessage must have a corresponding ToolMessage response or things break
+    # case 2: all HITL rejected
+    # every tool_call in AIMessage must have a corresponding filler ToolMessage
     if len(approved_ids) == 0:
-        tool_messages = [
-            ToolMessage(
-                content=f"User rejected this action: {r['feedback']}",
-                tool_call_id=r['call_id']
+        all_tool_messages = rejected_tool_msgs + non_hitl_tool_msgs
+
+        # if non-HITL tools exist, create new AIMessage for only them to be executed
+        if non_hitl_tool_calls:
+            new_ai_message = AIMessage(
+                content=last_ai_message.content,
+                tool_calls=non_hitl_tool_calls
             )
-            for r in rejected
-        ]
-        return {
-            'messages': tool_messages,
-            'pending_action': NO_ACTION,
-            'approval_outcome': {
-                'all_approved': False,
-                'approved_call_ids': [],
-                'rejected_feedback': rejected
-            }
-        }
+            return build_confirmation_result(
+                all_tool_messages + [new_ai_message],
+                False,
+                non_hitl_call_ids,
+                rejected
+            )
+
+        return build_confirmation_result(all_tool_messages, False, [], rejected)
 
     # case 3: partial approval
     # every tool_call in the original AIMessage needs a ToolMessage before any new AIMessage
-    # so we add ToolMessages for all tool calls (approved and rejected), then add
-    # a new AIMessage with only approved tool_calls for use_tools to execute
-    approved_tool_messages = [
-        ToolMessage(
-            content="User approved this action. Proceeding with execution.",
-            tool_call_id=call_id
-        )
-        for call_id in approved_ids
-    ]
-    rejected_tool_messages = [
-        ToolMessage(
-            content=f"User rejected this action: {r['feedback']}",
-            tool_call_id=r['call_id']
-        )
-        for r in rejected
-    ]
+    # add ToolMessages for all tool calls, then add a new AIMessage with approved tools
+    all_tool_messages = approved_tool_msgs + rejected_tool_msgs + non_hitl_tool_msgs
 
+    all_approved_ids = set(approved_ids) | set(non_hitl_call_ids)
     approved_tool_calls = [
         tc for tc in last_ai_message.tool_calls
-        if tc['id'] in approved_ids
+        if tc['id'] in all_approved_ids
     ]
     new_ai_message = AIMessage(
         content=last_ai_message.content,
         tool_calls=approved_tool_calls
     )
 
-    return {
-        'messages': approved_tool_messages + rejected_tool_messages + [new_ai_message],
-        'pending_action': NO_ACTION,
-        'approval_outcome': {
-            'all_approved': False,
-            'approved_call_ids': approved_ids,
-            'rejected_feedback': rejected
-        }
-    }
+    return build_confirmation_result(
+        all_tool_messages + [new_ai_message],
+        False,
+        approved_ids + non_hitl_call_ids,
+        rejected
+    )
 
 async def human_inquiry(state: RequestState):
     pass
