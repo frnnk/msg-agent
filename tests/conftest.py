@@ -76,8 +76,9 @@ MOCK_TOOLS = [
 
 @pytest.fixture(autouse=True)
 def patch_hitl_tools():
-    """Automatically patch HITL_TOOLS in the human module for all tests."""
-    with patch('agentic.nodes.human.HITL_TOOLS', MOCK_UNIT_HITL_TOOLS):
+    """Automatically patch HITL_TOOLS in the human and agent modules for all tests."""
+    with patch('agentic.nodes.human.HITL_TOOLS', MOCK_UNIT_HITL_TOOLS), \
+         patch('agentic.nodes.agent.HITL_TOOLS', MOCK_HITL_TOOLS):
         yield
 
 

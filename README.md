@@ -75,7 +75,9 @@ msg-agent/
 │   │   └── test_task_executor_speed.py
 │   └── unit/                       # Unit tests
 │       ├── test_human_confirmation.py
-│       └── test_human_clarification.py
+│       ├── test_human_clarification.py
+│       ├── test_policy_router.py   # Mock + real LLM tests for policy_router
+│       └── test_task_executor.py   # Mock LLM tests for task_executor routing
 │
 └── src/
     ├── main.py                # FastAPI entry point
@@ -451,7 +453,7 @@ Run all tests in parallel:
 uv run pytest tests/ -n auto -v
 ```
 
-- `-n auto` uses all available CPU cores
+- `-n auto` uses all available CPU cores (always use this flag)
 - `-n 4` uses 4 workers (specify manually)
 
 ### Test Architecture
@@ -468,6 +470,13 @@ MOCK_TOOL_MAPPING = {
 MOCK_HITL_TOOLS = {'mock_create_event', 'mock_update_event'}
 ```
 
+**Sample Tool Call Constants (for unit tests):**
+```python
+SAMPLE_CLARIFICATION_CALL = {'id': 'call_clarify_1', 'name': 'request_clarification', ...}
+SAMPLE_HITL_CALL = {'id': 'call_create_1', 'name': 'mock_create_event', ...}
+SAMPLE_NON_HITL_CALL = {'id': 'call_list_1', 'name': 'mock_list_events', ...}
+```
+
 **Mock Tools:**
 | Tool | Type | Description |
 |------|------|-------------|
@@ -481,13 +490,25 @@ MOCK_HITL_TOOLS = {'mock_create_event', 'mock_update_event'}
 **Fixtures:**
 | Fixture | Scope | Purpose |
 |---------|-------|---------|
-| `patch_hitl_tools` | autouse | Patches `HITL_TOOLS` in human module |
+| `patch_hitl_tools` | autouse | Patches `HITL_TOOLS` in human and agent modules |
 | `patch_tool_mapping` | autouse | Patches `TOOL_MAPPING` in agent.py and prompts.py |
 | `mock_mcp_client` | manual | Patches `CLIENT.get_tools` to return mock tools |
 | `timing_threshold` | manual | Returns speed thresholds for benchmark tests |
 | `verify_api_key` | manual | Skips test if no API key available |
 
 This ensures tests don't break when `TOOL_MAPPING` or `HITL_TOOLS` in `mcp_module/adapter.py` changes.
+
+### Unit Tests
+
+**test_policy_router.py** - Tests for `policy_router` node:
+- `TestPolicyRouterMockLLM`: Mock LLM tests (post-LLM extraction logic)
+- `TestPolicyRouterRealLLM`: Real LLM tests (requires API key via `verify_api_key` fixture)
+
+**test_task_executor.py** - Tests for `task_executor` node routing logic:
+- `TestClarificationRouting`: Clarification tool detection and priority
+- `TestHITLRouting`: HITL tool detection and extraction
+- `TestNoToolCalls`: Final response handling when no tools are called
+- `TestRegularToolCalls`: Non-HITL tool handling (no pending_action)
 
 ## Testing Flows
 

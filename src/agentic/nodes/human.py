@@ -146,7 +146,8 @@ async def human_clarification(state: RequestState):
 
     # interrupt and wait for user responses
     result = interrupt(None)
-    # expected: {'responses': [{'call_id': '...', 'response': '...'}, ...]}
+
+    # expected from /resume: {'responses': [{'call_id': '...', 'response': '...'}, ...]}
     responses = result.get('responses', [])
     response_map = {r['call_id']: r['response'] for r in responses}
 
