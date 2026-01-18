@@ -24,10 +24,34 @@ TOOL_MAPPING = {
 }
 HITL_TOOLS = {'create_event', 'update_event'}
 
+_tools_cache = None
+_cache_lock = asyncio.Lock()
 
-async def get_tools(server_name: str = None):
-    tools = await CLIENT.get_tools(server_name=server_name)
-    return tools
+
+async def get_tools(server_name: str = None, use_cache: bool = True):
+    """Get tools from MCP server with optional caching.
+
+    Only caches non-empty responses to avoid caching OAuth-needed states.
+    """
+    global _tools_cache
+
+    if not use_cache:
+        return await CLIENT.get_tools(server_name=server_name)
+
+    async with _cache_lock:
+        if _tools_cache is not None:
+            return _tools_cache
+
+        tools = await CLIENT.get_tools(server_name=server_name)
+        if tools:
+            _tools_cache = tools
+        return tools
+
+
+def invalidate_tools_cache():
+    """Clear the tools cache. Call when tools may have changed."""
+    global _tools_cache
+    _tools_cache = None
 
 
 if __name__ == '__main__':
