@@ -14,7 +14,8 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 load_dotenv()
-SERVER_URL = f"https://{os.getenv('SERVER_DOMAIN')}"
+DOMAIN = os.getenv('SERVER_DOMAIN')
+SERVER_URL = f"https://{DOMAIN}" if "localhost" not in DOMAIN else f"http://{DOMAIN}"
 
 console = Console()
 

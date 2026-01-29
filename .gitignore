@@ -1,6 +1,7 @@
 # Custom
 system.txt
 claude.md
+failure_modes.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

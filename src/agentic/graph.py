@@ -2,7 +2,6 @@
 Main entrypoint for the agentic system.
 """
 
-import logging
 from typing import Literal
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
@@ -12,7 +11,7 @@ from agentic.nodes.agent import policy_router, task_executor
 from agentic.nodes.tool import use_tools
 from agentic.nodes.human import human_confirmation, human_clarification, oauth_needed
 from agentic.edges import route_from_task_executor, oauth_url_detection, route_from_human_confirmation, route_from_human_clarification
-
+from agentic.config import LANGFUSE_CALLBACK
 
 # each node in our agentic system is represented by a function
 graph_config = StateGraph(state_schema=RequestState)
@@ -60,7 +59,8 @@ async def run_graph(thread_id: str, initial_request: str) -> RequestState:
             "allowed_tool_types": []
         },
         config={
-            "configurable": {"thread_id": thread_id}
+            "configurable": {"thread_id": thread_id},
+            "callbacks": [LANGFUSE_CALLBACK]
         }
     )
     return message

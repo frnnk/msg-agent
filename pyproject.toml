@@ -20,6 +20,7 @@ dependencies = [
     "fastapi>=0.128.0",
     "langchain-mcp-adapters>=0.2.1",
     "langchain[google-genai,openai]>=1.2.3",
+    "langfuse>=3.12.1",
     "langgraph>=1.0.5",
     "typing>=3.10.0.0",
 ]

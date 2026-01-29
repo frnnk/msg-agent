@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
+from langfuse.langchain import CallbackHandler
 
 load_dotenv()
 
@@ -18,3 +19,5 @@ POLICY_ROUTER_MODEL = init_chat_model(
     model='openai:gpt-5-nano',
     temperature=0
 )
+
+LANGFUSE_CALLBACK = CallbackHandler()
