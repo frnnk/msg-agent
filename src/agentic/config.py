@@ -20,4 +20,6 @@ POLICY_ROUTER_MODEL = init_chat_model(
     temperature=0
 )
 
-LANGFUSE_CALLBACK = CallbackHandler()
+LANGFUSE_CALLBACK = None
+if os.getenv('LANGFUSE_PUBLIC_KEY') and os.getenv('LANGFUSE_SECRET_KEY'):
+    LANGFUSE_CALLBACK = CallbackHandler()

@@ -60,7 +60,7 @@ async def run_graph(thread_id: str, initial_request: str) -> RequestState:
         },
         config={
             "configurable": {"thread_id": thread_id},
-            "callbacks": [LANGFUSE_CALLBACK]
+            "callbacks": [LANGFUSE_CALLBACK] if LANGFUSE_CALLBACK else []
         }
     )
     return message
