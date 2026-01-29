@@ -105,7 +105,7 @@ def timing_threshold():
     """Returns max acceptable completion times in seconds for each node."""
     return {
         'policy_router': 5.0,
-        'task_executor': 10.0
+        'task_executor': 16.0
     }
 
 

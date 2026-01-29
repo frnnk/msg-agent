@@ -15,6 +15,6 @@ TASK_EXECUTOR_MODEL = init_chat_model(
 )
 
 POLICY_ROUTER_MODEL = init_chat_model(
-    model='openai:gpt-4.1-nano',
+    model='openai:gpt-5-nano',
     temperature=0
 )
