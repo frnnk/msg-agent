@@ -4,9 +4,8 @@ Entrypoint for the FastAPI server.
 
 import logging
 from fastapi import FastAPI, Response, status
-from langgraph.types import Command
 from utils.models import RunBody, ResumeBody, AgentResponse
-from agentic.graph import run_graph, graph
+from agentic.graph import run_graph, resume_graph
 from agentic.state import NO_ACTION
 
 logging.basicConfig(
@@ -97,9 +96,9 @@ async def resume(body: ResumeBody, response: Response):
         )
 
     try:
-        final_state = await graph.ainvoke(
-            Command(resume=resume_data),
-            config={"configurable": {"thread_id": body.thread_id}}
+        final_state = await resume_graph(
+            thread_id=body.thread_id,
+            resume_data=resume_data
         )
 
         pending = final_state.get('pending_action', NO_ACTION)

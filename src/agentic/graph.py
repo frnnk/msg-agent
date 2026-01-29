@@ -5,6 +5,7 @@ Main entrypoint for the agentic system.
 from typing import Literal
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.types import Command
 from langchain.messages import HumanMessage
 from agentic.state import RequestState
 from agentic.nodes.agent import policy_router, task_executor
@@ -66,5 +67,12 @@ async def run_graph(thread_id: str, initial_request: str) -> RequestState:
     return message
 
 
-if __name__ == "__main__":
-    pass
+async def resume_graph(thread_id: str, resume_data) -> RequestState:
+    state = await graph.ainvoke(
+        Command(resume=resume_data),
+        config={
+            "configurable": {"thread_id": thread_id},
+            "callbacks": [LANGFUSE_CALLBACK] if LANGFUSE_CALLBACK else []
+        }
+    )
+    return state
