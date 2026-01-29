@@ -85,7 +85,7 @@ msg-agent/
     ├── agentic/
     │   ├── config.py          # Model initialization, Langfuse callback
     │   ├── state.py           # RequestState schema
-    │   ├── graph.py           # LangGraph workflow definition
+    │   ├── graph.py           # LangGraph workflow definition (run_graph, resume_graph)
     │   ├── edges.py           # Conditional routing logic
     │   │
     │   ├── nodes/
@@ -615,7 +615,7 @@ curl -X POST http://127.0.0.1:8002/resume \
 
 ## Observability
 
-[Langfuse](https://langfuse.com) is integrated for tracing LLM calls and agent execution. Set the `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_HOST` environment variables to enable it. Traces are sent automatically via a LangChain callback handler wired into the graph execution.
+[Langfuse](https://langfuse.com) is integrated for tracing LLM calls and agent execution. Set the `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_HOST` environment variables to enable it. Traces are sent automatically via a LangChain callback handler wired into both `run_graph` and `resume_graph` in `graph.py`.
 
 ## Related
 
