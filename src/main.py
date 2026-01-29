@@ -51,12 +51,13 @@ async def run(body: RunBody, response: Response):
             pending_action=pending
         )
 
-    if pending['kind'] == 'oauth_url':
+    auth_url = final_state.get('auth_url')
+    if auth_url:
         response.status_code = status.HTTP_202_ACCEPTED
         return AgentResponse(
             status="oauth_required",
             response=final_state['final_response'],
-            url=pending['url']
+            url=auth_url,
         )
 
     return AgentResponse(
@@ -119,12 +120,13 @@ async def resume(body: ResumeBody, response: Response):
                 pending_action=pending
             )
 
-        if pending['kind'] == 'oauth_url':
+        auth_url = final_state.get('auth_url')
+        if auth_url:
             response.status_code = status.HTTP_202_ACCEPTED
             return AgentResponse(
                 status="oauth_required",
                 response=final_state.get('final_response'),
-                url=pending['url']
+                url=auth_url,
             )
 
         return AgentResponse(

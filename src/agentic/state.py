@@ -64,4 +64,5 @@ class RequestState(MessagesState):
     pending_action: NotRequired[PendingAction]
     final_response: NotRequired[str]
     approval_outcome: NotRequired[ApprovalOutcome]
+    auth_url: NotRequired[str]
 

@@ -33,7 +33,8 @@ async def policy_router(state: RequestState):
     logging.info(f"Policy note: {schema['note']}")
 
     return {
-        'allowed_tool_types': schema['allowed_tool_types']
+        'allowed_tool_types': schema['allowed_tool_types'],
+        'auth_url': None,
     }
 
 async def task_executor(state: RequestState):

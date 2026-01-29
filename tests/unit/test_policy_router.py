@@ -108,7 +108,7 @@ class TestPolicyRouterMockLLM:
         with patch('agentic.nodes.agent.POLICY_ROUTER_MODEL', mock_model):
             result = await policy_router(state)
 
-        assert set(result.keys()) == {'allowed_tool_types'}
+        assert set(result.keys()) == {'allowed_tool_types', 'auth_url'}
 
 
 class TestPolicyRouterRealLLM:
