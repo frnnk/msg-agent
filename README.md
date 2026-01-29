@@ -60,7 +60,7 @@ flowchart TD
 
 ```
 msg-agent/
-├── .env                       # Environment configuration
+├── .env                       # Environment configuration (API keys, Langfuse)
 ├── .gitignore
 ├── .python-version            # Python 3.13
 ├── pyproject.toml             # Dependencies and metadata
@@ -83,6 +83,7 @@ msg-agent/
     ├── main.py                # FastAPI entry point
     │
     ├── agentic/
+    │   ├── config.py          # Model initialization, Langfuse callback
     │   ├── state.py           # RequestState schema
     │   ├── graph.py           # LangGraph workflow definition
     │   ├── edges.py           # Conditional routing logic
@@ -124,6 +125,9 @@ Create a `.env` file with:
 ASSISTANT_MCP_URL=http://127.0.0.1:8000/mcp
 GOOGLE_API_KEY=your-google-api-key
 OPENAI_API_KEY=your-openai-api-key
+LANGFUSE_PUBLIC_KEY=your-langfuse-public-key
+LANGFUSE_SECRET_KEY=your-langfuse-secret-key
+LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
 | Variable | Description |
@@ -131,6 +135,9 @@ OPENAI_API_KEY=your-openai-api-key
 | `ASSISTANT_MCP_URL` | URL to the assistant-mcp server (or any mcp server) |
 | `GOOGLE_API_KEY` | API key for Gemini models (optional) |
 | `OPENAI_API_KEY` | API key for OpenAI models (optional) |
+| `LANGFUSE_PUBLIC_KEY` | Langfuse public key for observability (optional) |
+| `LANGFUSE_SECRET_KEY` | Langfuse secret key for observability (optional) |
+| `LANGFUSE_HOST` | Langfuse host URL (optional) |
 
 ## Running
 
@@ -289,6 +296,7 @@ class RequestState(MessagesState):
     pending_action: NotRequired[PendingAction] # OAuth, clarification, or confirmation
     final_response: NotRequired[str]           # Final message to user
     approval_outcome: NotRequired[ApprovalOutcome]  # Result of HITL approval
+    auth_url: NotRequired[str]                 # OAuth URL (cleared on new requests)
 
 class ToolCallInfo(TypedDict):
     call_id: str              # Unique ID from AIMessage.tool_calls[].id
@@ -604,6 +612,10 @@ curl -X POST http://127.0.0.1:8002/resume \
 
 # Response: success - first event created, second acknowledged as rejected
 ```
+
+## Observability
+
+[Langfuse](https://langfuse.com) is integrated for tracing LLM calls and agent execution. Set the `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_HOST` environment variables to enable it. Traces are sent automatically via a LangChain callback handler wired into the graph execution.
 
 ## Related
 
