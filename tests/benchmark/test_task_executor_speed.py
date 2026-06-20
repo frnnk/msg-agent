@@ -10,18 +10,18 @@ from agentic.nodes.agent import task_executor
 
 
 @pytest.mark.asyncio
-async def test_list_events_speed(verify_api_key, mock_mcp_client, timing_threshold):
-    """Benchmark query events request."""
+async def test_list_items_speed(verify_api_key, mock_mcp_client, timing_threshold):
+    """Benchmark query items request."""
     state = {
-        'messages': [HumanMessage(content="What's on my calendar today?")],
-        'allowed_tool_types': ['calendar']
+        'messages': [HumanMessage(content="What items do I have?")],
+        'allowed_tool_types': ['example']
     }
 
     start = time.perf_counter()
     result = await task_executor(state)
     elapsed = time.perf_counter() - start
 
-    print(f"\n[task_executor] list events: {elapsed:.3f}s")
+    print(f"\n[task_executor] list items: {elapsed:.3f}s")
 
     assert elapsed < timing_threshold['task_executor'], (
         f"task_executor took {elapsed:.3f}s, exceeds {timing_threshold['task_executor']}s threshold"
@@ -30,18 +30,18 @@ async def test_list_events_speed(verify_api_key, mock_mcp_client, timing_thresho
 
 
 @pytest.mark.asyncio
-async def test_create_event_speed(verify_api_key, mock_mcp_client, timing_threshold):
+async def test_create_item_speed(verify_api_key, mock_mcp_client, timing_threshold):
     """Benchmark HITL tool invocation request."""
     state = {
-        'messages': [HumanMessage(content="Schedule a dentist appointment tomorrow at 2pm")],
-        'allowed_tool_types': ['calendar']
+        'messages': [HumanMessage(content="Create an item called Quarterly Report")],
+        'allowed_tool_types': ['example']
     }
 
     start = time.perf_counter()
     result = await task_executor(state)
     elapsed = time.perf_counter() - start
 
-    print(f"\n[task_executor] create event: {elapsed:.3f}s")
+    print(f"\n[task_executor] create item: {elapsed:.3f}s")
 
     assert elapsed < timing_threshold['task_executor'], (
         f"task_executor took {elapsed:.3f}s, exceeds {timing_threshold['task_executor']}s threshold"
@@ -53,8 +53,8 @@ async def test_create_event_speed(verify_api_key, mock_mcp_client, timing_thresh
 async def test_ambiguous_request_speed(verify_api_key, mock_mcp_client, timing_threshold):
     """Benchmark ambiguous request that may trigger clarification."""
     state = {
-        'messages': [HumanMessage(content="Schedule something")],
-        'allowed_tool_types': ['calendar']
+        'messages': [HumanMessage(content="Create something")],
+        'allowed_tool_types': ['example']
     }
 
     start = time.perf_counter()
@@ -74,33 +74,33 @@ async def test_multi_turn_context_speed(verify_api_key, mock_mcp_client, timing_
     """Benchmark multi-turn conversation with tool results in context."""
     state = {
         'messages': [
-            HumanMessage(content="What's on my calendar today?"),
+            HumanMessage(content="What items do I have?"),
             AIMessage(
                 content="",
                 tool_calls=[{
-                    'id': 'call_list_calendars',
-                    'name': 'list_calendars',
+                    'id': 'call_list_items',
+                    'name': 'list_items',
                     'args': {}
                 }]
             ),
             ToolMessage(
-                content='[{"id": "primary", "summary": "Primary Calendar", "primary": true}]',
-                tool_call_id='call_list_calendars'
+                content='[{"id": "item-1", "name": "Example Item", "status": "active"}]',
+                tool_call_id='call_list_items'
             ),
             AIMessage(
                 content="",
                 tool_calls=[{
-                    'id': 'call_list_events',
-                    'name': 'list_events',
-                    'args': {'calendar_id': 'primary'}
+                    'id': 'call_get_item',
+                    'name': 'get_item',
+                    'args': {'item_id': 'item-1'}
                 }]
             ),
             ToolMessage(
-                content='[{"id": "event1", "summary": "Team Meeting", "start": {"dateTime": "2024-01-15T10:00:00"}}]',
-                tool_call_id='call_list_events'
+                content='{"id": "item-1", "name": "Example Item", "status": "active"}',
+                tool_call_id='call_get_item'
             )
         ],
-        'allowed_tool_types': ['calendar']
+        'allowed_tool_types': ['example']
     }
 
     start = time.perf_counter()

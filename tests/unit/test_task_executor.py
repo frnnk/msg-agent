@@ -19,21 +19,21 @@ SAMPLE_CLARIFICATION_CALL = {
 
 SAMPLE_HITL_CALL = {
     'id': 'call_create_1',
-    'name': 'mock_create_event',
-    'args': {'calendar_id': 'primary', 'summary': 'Meeting', 'start_time': '2024-01-15T10:00:00'}
+    'name': 'mock_create_item',
+    'args': {'name': 'Example Item', 'description': 'demo'}
 }
 
 SAMPLE_NON_HITL_CALL = {
     'id': 'call_list_1',
-    'name': 'mock_list_events',
-    'args': {'calendar_id': 'primary'}
+    'name': 'mock_list_items',
+    'args': {}
 }
 
 def create_state(user_message: str, allowed_tool_types: list = None) -> dict:
     """Create a minimal state for task_executor."""
     return {
         'messages': [HumanMessage(content=user_message)],
-        'allowed_tool_types': allowed_tool_types or ['calendar']
+        'allowed_tool_types': allowed_tool_types or ['example']
     }
 
 
@@ -86,7 +86,7 @@ class TestClarificationRouting:
         clarification_call_2 = {
             'id': 'call_clarify_2',
             'name': 'request_clarification',
-            'args': {'question': 'Which calendar?', 'context': 'Calendar selection'}
+            'args': {'question': 'Which item?', 'context': 'Item selection'}
         }
         mock_message = create_mock_ai_message(
             content="I need clarification.",
@@ -191,16 +191,16 @@ class TestHITLRouting:
         """Multiple HITL tools are all captured in tool_calls."""
         hitl_call_1 = {
             'id': 'call_create_1',
-            'name': 'mock_create_event',
-            'args': {'calendar_id': 'primary', 'summary': 'Meeting 1'}
+            'name': 'mock_create_item',
+            'args': {'name': 'Item 1'}
         }
         hitl_call_2 = {
             'id': 'call_update_1',
-            'name': 'mock_update_event',
-            'args': {'calendar_id': 'primary', 'event_id': 'evt1', 'summary': 'Updated'}
+            'name': 'mock_update_item',
+            'args': {'item_id': 'item-1', 'name': 'Updated'}
         }
         mock_message = create_mock_ai_message(
-            content="Managing events.",
+            content="Managing items.",
             tool_calls=[hitl_call_1, hitl_call_2]
         )
 
@@ -242,9 +242,9 @@ class TestHITLRouting:
 
         tool_call = result['pending_action']['tool_calls'][0]
         assert tool_call['call_id'] == 'call_create_1'
-        assert tool_call['tool_name'] == 'mock_create_event'
-        assert tool_call['arguments']['calendar_id'] == 'primary'
-        assert tool_call['arguments']['summary'] == 'Meeting'
+        assert tool_call['tool_name'] == 'mock_create_item'
+        assert tool_call['arguments']['name'] == 'Example Item'
+        assert tool_call['arguments']['description'] == 'demo'
 
 
     @pytest.mark.asyncio
@@ -261,17 +261,17 @@ class TestHITLRouting:
         mock_model = MagicMock()
         mock_model.bind_tools = MagicMock(return_value=mock_bound)
 
-        state = create_state("Show calendar and create event")
+        state = create_state("List items and create one")
         with patch('agentic.nodes.agent.TASK_EXECUTOR_MODEL', mock_model), \
              patch('agentic.nodes.agent.CLIENT.get_tools', mock_get_tools):
             result = await task_executor(state)
 
         assert result['pending_action']['kind'] == 'confirmation'
-        
+
         # only HITL tools should be in pending_action
         tool_names = [tc['tool_name'] for tc in result['pending_action']['tool_calls']]
-        assert 'mock_create_event' in tool_names
-        assert 'mock_list_events' not in tool_names
+        assert 'mock_create_item' in tool_names
+        assert 'mock_list_items' not in tool_names
 
 
 class TestNoToolCalls:
@@ -282,7 +282,7 @@ class TestNoToolCalls:
     async def test_no_tools_sets_final_response(self):
         """No tool calls sets final_response in state."""
         mock_message = create_mock_ai_message(
-            content="Here's what's on your calendar today.",
+            content="Here are your items.",
             tool_calls=[]
         )
 
@@ -292,12 +292,12 @@ class TestNoToolCalls:
         mock_model = MagicMock()
         mock_model.bind_tools = MagicMock(return_value=mock_bound)
 
-        state = create_state("What's on my calendar?")
+        state = create_state("What items do I have?")
         with patch('agentic.nodes.agent.TASK_EXECUTOR_MODEL', mock_model), \
              patch('agentic.nodes.agent.CLIENT.get_tools', mock_get_tools):
             result = await task_executor(state)
 
-        assert result['final_response'] == "Here's what's on your calendar today."
+        assert result['final_response'] == "Here are your items."
 
 
     @pytest.mark.asyncio
@@ -356,16 +356,16 @@ class TestRegularToolCalls:
         """Multiple non-HITL tools return message without pending_action."""
         non_hitl_call_1 = {
             'id': 'call_list_1',
-            'name': 'mock_list_events',
-            'args': {'calendar_id': 'primary'}
-        }
-        non_hitl_call_2 = {
-            'id': 'call_list_calendars_1',
-            'name': 'mock_list_calendars',
+            'name': 'mock_list_items',
             'args': {}
         }
+        non_hitl_call_2 = {
+            'id': 'call_get_item_1',
+            'name': 'mock_get_item',
+            'args': {'item_id': 'item-1'}
+        }
         mock_message = create_mock_ai_message(
-            content="Getting calendar info.",
+            content="Getting item info.",
             tool_calls=[non_hitl_call_1, non_hitl_call_2]
         )
 
@@ -375,7 +375,7 @@ class TestRegularToolCalls:
         mock_model = MagicMock()
         mock_model.bind_tools = MagicMock(return_value=mock_bound)
 
-        state = create_state("Show all calendars and events")
+        state = create_state("List all items and get one")
         with patch('agentic.nodes.agent.TASK_EXECUTOR_MODEL', mock_model), \
              patch('agentic.nodes.agent.CLIENT.get_tools', mock_get_tools):
             result = await task_executor(state)

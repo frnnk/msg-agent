@@ -1,6 +1,8 @@
 # MSG-Agent
 
-A LangGraph-based agentic system that acts as an MCP client, consuming tools from assistant-mcp to fulfill user requests for calendar operations.
+A LangGraph-based agentic **template**: a robust harness built for cheaper models that acts as an MCP client, consuming tools from an MCP servers to fulfill user requests, with policy routing and human-in-the-loop confirmation. Also supports defining tools directly instead of going the MCP route.
+
+This branch serves as a clean starting point. External connections (LLM provider, MCP server, Langfuse) are placeholders marked with `TODO(template)`; copy `.env.example` to `.env` and fill them in. The demo tool domain is a neutral `example` (`list_items` / `get_item` / `create_item` / `update_item`): swap it for your own MCP tools in `src/mcp_module/adapter.py`. The test suite passes with no credentials (`uv run pytest`); real-LLM and benchmark tests skip automatically until you set a key.
 
 ## Architecture
 
@@ -33,7 +35,7 @@ flowchart TD
 
 | Node | Purpose |
 |------|---------|
-| `policy_router` | Evaluates user request and determines which tool types (calendar, maps) are allowed |
+| `policy_router` | Evaluates user request and determines which tool types are allowed |
 | `task_executor` | Main agent loop - makes tool calls, requests clarifications, produces final response |
 | `use_tools` | Executes MCP tool calls via LangGraph ToolNode |
 | `human_clarification` | Human-in-the-loop node for clarification requests when info is ambiguous |
@@ -60,7 +62,7 @@ flowchart TD
 
 ```
 msg-agent/
-├── .env                       # Environment configuration (API keys, Langfuse)
+├── .env.example               # Template env file (copy to .env and fill in)
 ├── .gitignore
 ├── .python-version            # Python 3.13
 ├── pyproject.toml             # Dependencies and metadata
@@ -119,22 +121,22 @@ uv sync
 
 ## Configuration
 
-Create a `.env` file with:
+Copy the example file and fill in your values:
 
-```env
-ASSISTANT_MCP_URL=http://127.0.0.1:8000/mcp
-GOOGLE_API_KEY=your-google-api-key
-OPENAI_API_KEY=your-openai-api-key
-LANGFUSE_PUBLIC_KEY=your-langfuse-public-key
-LANGFUSE_SECRET_KEY=your-langfuse-secret-key
-LANGFUSE_HOST=https://cloud.langfuse.com
+```bash
+cp .env.example .env
 ```
+
+The code is import-safe without a `.env` (placeholder values are used so tests run
+offline), but you need real values to actually reach an LLM and your MCP server.
 
 | Variable | Description |
 |----------|-------------|
-| `ASSISTANT_MCP_URL` | URL to the assistant-mcp server (or any mcp server) |
-| `GOOGLE_API_KEY` | API key for Gemini models (optional) |
-| `OPENAI_API_KEY` | API key for OpenAI models (optional) |
+| `OPENAI_API_KEY` | API key for OpenAI models |
+| `GOOGLE_API_KEY` | API key for Gemini models |
+| `TASK_EXECUTOR_MODEL` | Override the task executor model, format `provider:model` (optional) |
+| `POLICY_ROUTER_MODEL` | Override the policy router model, format `provider:model` (optional) |
+| `EXAMPLE_MCP_URL` | URL to the MCP server providing the agent's tools |
 | `LANGFUSE_PUBLIC_KEY` | Langfuse public key for observability (optional) |
 | `LANGFUSE_SECRET_KEY` | Langfuse secret key for observability (optional) |
 | `LANGFUSE_HOST` | Langfuse host URL (optional) |
@@ -157,7 +159,7 @@ Execute a user request through the agent workflow.
 ```bash
 curl -X POST http://127.0.0.1:8002/run \
   -H "Content-Type: application/json" \
-  -d '{"thread_id": "any-string", "user_request": "show me what is on my calendar"}'
+  -d '{"thread_id": "any-string", "user_request": "show me my items"}'
 ```
 
 **Request Body:**
@@ -171,7 +173,7 @@ curl -X POST http://127.0.0.1:8002/run \
 ```json
 {
   "status": "success",
-  "response": "Upcoming event on your primary calendar:\n\n- Test Event\n  - When: Friday, January 15, 2026 from 1:30 PM to 2:30 PM"
+  "response": "You have 1 item:\n\n- Example Item (active)"
 }
 ```
 
@@ -185,8 +187,8 @@ curl -X POST http://127.0.0.1:8002/run \
     "clarifications": [
       {
         "call_id": "call_abc123",
-        "question": "What would you like to schedule?",
-        "context": "Scheduling on the primary calendar."
+        "question": "What would you like to create?",
+        "context": "Creating a new item."
       }
     ]
   }
@@ -203,12 +205,10 @@ curl -X POST http://127.0.0.1:8002/run \
     "tool_calls": [
       {
         "call_id": "call_abc123",
-        "tool_name": "create_event",
+        "tool_name": "create_item",
         "arguments": {
-          "calendar_id": "primary",
-          "start": "2026-01-16T10:00:00",
-          "name": "Team Meeting",
-          "duration_minutes": 30
+          "name": "Quarterly Report",
+          "description": "Q1 summary"
         }
       }
     ]
@@ -227,7 +227,7 @@ curl -X POST http://127.0.0.1:8002/resume \
   -d '{
     "thread_id": "any-string",
     "clarification_responses": [
-      {"call_id": "call_abc123", "response": "a meeting tomorrow at 3pm"}
+      {"call_id": "call_abc123", "response": "an item called Quarterly Report"}
     ]
   }'
 ```
@@ -263,7 +263,7 @@ curl -X POST http://127.0.0.1:8002/resume \
 ```json
 {
   "status": "success",
-  "response": "Team Meeting has been created for January 16, 2026 at 10:00 AM."
+  "response": "The item \"Quarterly Report\" has been created."
 }
 ```
 
@@ -277,16 +277,21 @@ curl http://127.0.0.1:8002/health-check
 
 ## MCP Tool Mapping
 
-Modify this to whatever MCP server you are connecting.
+Defined in `src/mcp_module/adapter.py`. Replace the placeholder `example` domain with
+the tool types and tools your MCP server exposes.
 
 ```python
 TOOL_MAPPING = {
-    'calendar': ["list_calendars", "list_events", "create_event", "update_event"]
+    'example': ["list_items", "get_item", "create_item", "update_item"]
 }
 
 # Tools requiring human-in-the-loop confirmation
-HITL_TOOLS = {'create_event', 'update_event'}
+HITL_TOOLS = {'create_item', 'update_item'}
 ```
+
+When you change the tool types, also update the `Literal` in
+`PolicyRouterOut.allowed_tool_types` (`src/agentic/schema/models.py`) so the policy
+router can select them.
 
 ## State Schema
 
@@ -374,22 +379,22 @@ When the agent calls both `request_clarification` and other tools (HITL or non-H
 ### Example: Complex Flow
 
 ```
-User: "schedule something for me, and move the meeting at 3pm to 4pm"
+User: "create something for me, and rename item-1 to Archive"
     ↓
-Agent calls: [request_clarification, update_event]
+Agent calls: [request_clarification, update_item]
     ↓
 clarification_required (priority)
-    Question: "What would you like to schedule?"
+    Question: "What would you like to create?"
     ↓
-User provides: "a dentist appointment on Friday at 10am"
+User provides: "an item called Quarterly Report"
     ↓
-confirmation_required (deferred update_event)
-    Tool: update_event (move meeting to 4pm)
+confirmation_required (deferred update_item)
+    Tool: update_item (rename item-1 to Archive)
     ↓
 User: approved
     ↓
-confirmation_required (new create_event from clarification)
-    Tool: create_event (Dentist Appointment)
+confirmation_required (new create_item from clarification)
+    Tool: create_item (Quarterly Report)
     ↓
 User: approved
     ↓
@@ -398,7 +403,7 @@ success: Both actions completed
 
 ## Human-in-the-Loop (HITL) Flow
 
-Tools in `HITL_TOOLS` (`create_event`, `update_event`) require user confirmation before execution.
+Tools in `HITL_TOOLS` (`create_item`, `update_item`) require user confirmation before execution.
 
 ### Flow Diagram
 
@@ -434,7 +439,7 @@ Tools in `HITL_TOOLS` (`create_event`, `update_event`) require user confirmation
 
 ### Mixed Tool Handling
 
-When an AIMessage contains both HITL tools (e.g., `create_event`) and non-HITL tools (e.g., `list_calendars`):
+When an AIMessage contains both HITL tools (e.g., `create_item`) and non-HITL tools (e.g., `list_items`):
 - Non-HITL tools are **auto-approved** and always included in execution
 - Only HITL tools require user confirmation
 - If all HITL tools are rejected, non-HITL tools still execute via a new AIMessage
@@ -471,29 +476,29 @@ Tests are fully decoupled from src definitions via mock constants and fixtures i
 **Mock Tool Mapping:**
 ```python
 MOCK_TOOL_MAPPING = {
-    'calendar': ['mock_list_calendars', 'mock_list_events', 'mock_create_event', 'mock_update_event'],
-    'maps': ['mock_search_places', 'mock_get_directions'],
+    'example': ['mock_list_items', 'mock_get_item', 'mock_create_item', 'mock_update_item'],
+    'lookup': ['mock_search', 'mock_fetch'],
 }
 
-MOCK_HITL_TOOLS = {'mock_create_event', 'mock_update_event'}
+MOCK_HITL_TOOLS = {'mock_create_item', 'mock_update_item'}
 ```
 
 **Sample Tool Call Constants (for unit tests):**
 ```python
 SAMPLE_CLARIFICATION_CALL = {'id': 'call_clarify_1', 'name': 'request_clarification', ...}
-SAMPLE_HITL_CALL = {'id': 'call_create_1', 'name': 'mock_create_event', ...}
-SAMPLE_NON_HITL_CALL = {'id': 'call_list_1', 'name': 'mock_list_events', ...}
+SAMPLE_HITL_CALL = {'id': 'call_create_1', 'name': 'mock_create_item', ...}
+SAMPLE_NON_HITL_CALL = {'id': 'call_list_1', 'name': 'mock_list_items', ...}
 ```
 
 **Mock Tools:**
 | Tool | Type | Description |
 |------|------|-------------|
-| `mock_list_calendars` | calendar | Returns mock calendar list |
-| `mock_list_events` | calendar | Returns mock events |
-| `mock_create_event` | calendar, HITL | Returns created event |
-| `mock_update_event` | calendar, HITL | Returns updated event |
-| `mock_search_places` | maps | Returns mock places |
-| `mock_get_directions` | maps | Returns mock directions |
+| `mock_list_items` | example | Returns mock item list |
+| `mock_get_item` | example | Returns a mock item |
+| `mock_create_item` | example, HITL | Returns created item |
+| `mock_update_item` | example, HITL | Returns updated item |
+| `mock_search` | lookup | Returns mock search results |
+| `mock_fetch` | lookup | Returns mock fetched content |
 
 **Fixtures:**
 | Fixture | Scope | Purpose |
@@ -531,32 +536,32 @@ uv run uvicorn src.main:app --port 8002
 # Step 1: Ambiguous request
 curl -X POST http://127.0.0.1:8002/run \
   -H "Content-Type: application/json" \
-  -d '{"thread_id": "test-clarify", "user_request": "schedule something"}'
+  -d '{"thread_id": "test-clarify", "user_request": "create something"}'
 
 # Response: clarification_required with call_id and question
 
 # Step 2: Provide clarification
 curl -X POST http://127.0.0.1:8002/resume \
   -H "Content-Type: application/json" \
-  -d '{"thread_id": "test-clarify", "clarification_responses": [{"call_id": "<call_id>", "response": "a meeting tomorrow at 3pm"}]}'
+  -d '{"thread_id": "test-clarify", "clarification_responses": [{"call_id": "<call_id>", "response": "an item called Quarterly Report"}]}'
 
-# Response: confirmation_required for create_event
+# Response: confirmation_required for create_item
 
 # Step 3: Approve
 curl -X POST http://127.0.0.1:8002/resume \
   -H "Content-Type: application/json" \
   -d '{"thread_id": "test-clarify", "approvals": [{"call_id": "<call_id>", "approved": true}]}'
 
-# Response: success with event created
+# Response: success with item created
 ```
 
 ### Test 2: Direct Approval
 
 ```bash
-# Step 1: Create event request
+# Step 1: Create item request
 curl -X POST http://127.0.0.1:8002/run \
   -H "Content-Type: application/json" \
-  -d '{"thread_id": "test-1", "user_request": "create a meeting called Standup tomorrow at 9am"}'
+  -d '{"thread_id": "test-1", "user_request": "create an item called Standup Notes"}'
 
 # Response: confirmation_required with call_id
 
@@ -565,37 +570,37 @@ curl -X POST http://127.0.0.1:8002/resume \
   -H "Content-Type: application/json" \
   -d '{"thread_id": "test-1", "approvals": [{"call_id": "<call_id>", "approved": true}]}'
 
-# Response: success with event created
+# Response: success with item created
 ```
 
-### Test 2: Rejection with Feedback
+### Test 3: Rejection with Feedback
 
 ```bash
-# Step 1: Create event request
+# Step 1: Create item request
 curl -X POST http://127.0.0.1:8002/run \
   -H "Content-Type: application/json" \
-  -d '{"thread_id": "test-2", "user_request": "create an event called Dentist tomorrow at 9am"}'
+  -d '{"thread_id": "test-2", "user_request": "create an item called Draft"}'
 
 # Step 2: Reject with feedback
 curl -X POST http://127.0.0.1:8002/resume \
   -H "Content-Type: application/json" \
-  -d '{"thread_id": "test-2", "approvals": [{"call_id": "<call_id>", "approved": false, "feedback": "Wrong time, should be 10am"}]}'
+  -d '{"thread_id": "test-2", "approvals": [{"call_id": "<call_id>", "approved": false, "feedback": "Name it Final instead"}]}'
 
-# Response: confirmation_required with corrected time (10am)
+# Response: confirmation_required with corrected name (Final)
 
-# Step 3: Approve corrected event
+# Step 3: Approve corrected item
 curl -X POST http://127.0.0.1:8002/resume \
   -H "Content-Type: application/json" \
   -d '{"thread_id": "test-2", "approvals": [{"call_id": "<new_call_id>", "approved": true}]}'
 ```
 
-### Test 3: Partial Approval
+### Test 4: Partial Approval
 
 ```bash
-# Step 1: Create 2 events
+# Step 1: Create 2 items
 curl -X POST http://127.0.0.1:8002/run \
   -H "Content-Type: application/json" \
-  -d '{"thread_id": "test-3", "user_request": "create 2 events: Team Meeting at 10am and Lunch with Bob at 12pm"}'
+  -d '{"thread_id": "test-3", "user_request": "create 2 items: Report A and Report B"}'
 
 # Response: confirmation_required with 2 tool_calls
 
@@ -606,11 +611,11 @@ curl -X POST http://127.0.0.1:8002/resume \
     "thread_id": "test-3",
     "approvals": [
       {"call_id": "<call_id_1>", "approved": true},
-      {"call_id": "<call_id_2>", "approved": false, "feedback": "I have other lunch plans"}
+      {"call_id": "<call_id_2>", "approved": false, "feedback": "Do not create Report B"}
     ]
   }'
 
-# Response: success - first event created, second acknowledged as rejected
+# Response: success - first item created, second acknowledged as rejected
 ```
 
 ## Observability
@@ -619,4 +624,4 @@ curl -X POST http://127.0.0.1:8002/resume \
 
 ## Related
 
-- **assistant-mcp**: The MCP server providing calendar/maps tools
+- **Your MCP server**: Provides the tools listed in `TOOL_MAPPING`. Point `EXAMPLE_MCP_URL` at it.

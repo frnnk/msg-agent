@@ -23,12 +23,12 @@ class TestPolicyRouterMockLLM:
     Tests post-LLM logic by mocking the model's response.
     """
     @pytest.mark.asyncio
-    async def test_calendar_allowed_extracts_tool_types(self):
-        """Verify extraction when calendar tools are allowed."""
+    async def test_example_allowed_extracts_tool_types(self):
+        """Verify extraction when example tools are allowed."""
         mock_response = PolicyRouterOut(
             decision='allow',
-            note='Calendar request detected',
-            allowed_tool_types=['calendar']
+            note='Item request detected',
+            allowed_tool_types=['example']
         )
 
         mock_structured = MagicMock()
@@ -37,11 +37,11 @@ class TestPolicyRouterMockLLM:
         mock_model = MagicMock()
         mock_model.with_structured_output = MagicMock(return_value=mock_structured)
 
-        state = create_state("What's on my calendar?")
+        state = create_state("What items do I have?")
         with patch('agentic.nodes.agent.POLICY_ROUTER_MODEL', mock_model):
             result = await policy_router(state)
 
-        assert result['allowed_tool_types'] == ['calendar']
+        assert result['allowed_tool_types'] == ['example']
 
 
     @pytest.mark.asyncio
@@ -72,7 +72,7 @@ class TestPolicyRouterMockLLM:
         mock_response = PolicyRouterOut(
             decision='allow',
             note='This note should not be in result',
-            allowed_tool_types=['calendar']
+            allowed_tool_types=['example']
         )
 
         mock_structured = MagicMock()
@@ -81,7 +81,7 @@ class TestPolicyRouterMockLLM:
         mock_model = MagicMock()
         mock_model.with_structured_output = MagicMock(return_value=mock_structured)
 
-        state = create_state("Show my calendar")
+        state = create_state("Show my items")
         with patch('agentic.nodes.agent.POLICY_ROUTER_MODEL', mock_model):
             result = await policy_router(state)
 
@@ -95,7 +95,7 @@ class TestPolicyRouterMockLLM:
         mock_response = PolicyRouterOut(
             decision='allow',
             note='Test note',
-            allowed_tool_types=['calendar']
+            allowed_tool_types=['example']
         )
 
         mock_structured = MagicMock()
@@ -117,21 +117,21 @@ class TestPolicyRouterRealLLM:
     Tests actual routing correctness with the configured model.
     """
     @pytest.mark.asyncio
-    async def test_calendar_request_routes_to_calendar(self, verify_api_key):
-        """Calendar viewing request should route to calendar tools."""
-        state = create_state("What's on my calendar?")
+    async def test_item_request_routes_to_example(self, verify_api_key):
+        """Item viewing request should route to example tools."""
+        state = create_state("What items do I have?")
         result = await policy_router(state)
 
-        assert 'calendar' in result['allowed_tool_types']
+        assert 'example' in result['allowed_tool_types']
 
 
     @pytest.mark.asyncio
-    async def test_scheduling_request_routes_to_calendar(self, verify_api_key):
-        """Scheduling request should route to calendar tools."""
-        state = create_state("Schedule a meeting tomorrow at 3pm")
+    async def test_create_request_routes_to_example(self, verify_api_key):
+        """Create request should route to example tools."""
+        state = create_state("Create a new item called Report")
         result = await policy_router(state)
 
-        assert 'calendar' in result['allowed_tool_types']
+        assert 'example' in result['allowed_tool_types']
 
 
     @pytest.mark.asyncio
@@ -148,10 +148,10 @@ class TestPolicyRouterRealLLM:
         state = create_state("Help me")
         result = await policy_router(state)
 
-        # should return a valid list (could be empty or contain 'calendar')
+        # should return a valid list (could be empty or contain 'example')
         assert isinstance(result['allowed_tool_types'], list)
         for tool_type in result['allowed_tool_types']:
-            assert tool_type in ['calendar']
+            assert tool_type in ['example']
 
 
 if __name__ == '__main__':

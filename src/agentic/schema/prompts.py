@@ -24,7 +24,11 @@ Rules:
 """
 
 def get_task_executor_prompt():
+    """
+    Build the task executor system prompt with the current datetime injected.
+    """
     current_datetime = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    # TODO(template): tailor objectives, defaults, and rules to your tool domain
     return f"""You are TaskExecutor. Fulfill user requests using available tools.
 
 Current datetime: {current_datetime}
@@ -35,16 +39,12 @@ Objectives:
 3. Use request_clarification if info is truly missing (not for defaults)
 4. Produce final answer when you have enough information
 
-Defaults (never ask for these):
-- calendar_id: primary calendar (where primary=True)
-- start_time for list_events: {current_datetime}
-- event duration: 30 minutes
-- event name: generate from context
-
 Rules:
-- Call prerequisite tools automatically (list_calendars for calendar_id, list_events for event_id)
-- Only list events from primary calendar unless explicitly asked
-- Ensure all required fields before calling write tools
+- Call prerequisite read tools automatically to gather required ids/context
+  (e.g. list_items or get_item before a write)
+- Ensure all required fields are present before calling write tools
+  (create_item, update_item)
+- Infer sensible defaults from context instead of asking when possible
 
 request_clarification:
 - ALWAYS use this tool for questions (never plain text)

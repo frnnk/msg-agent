@@ -15,8 +15,8 @@ async def policy_router(state: RequestState):
     """
     Policy router node.
 
-    Analyzes the user request to determine which tool types (calendar) are
-    permitted for the current conversation. Adds allowed_tool_types to state.
+    Analyzes the user request to determine which tool types are permitted for
+    the current conversation. Adds allowed_tool_types to state.
 
     Uses structured output to ensure consistent policy decisions.
     """

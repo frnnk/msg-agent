@@ -10,17 +10,17 @@ from agentic.nodes.agent import policy_router
 
 
 @pytest.mark.asyncio
-async def test_calendar_request_speed(verify_api_key, timing_threshold):
-    """Benchmark simple calendar routing request."""
+async def test_item_request_speed(verify_api_key, timing_threshold):
+    """Benchmark simple item routing request."""
     state = {
-        'messages': [HumanMessage(content="What's on my calendar today?")]
+        'messages': [HumanMessage(content="What items do I have?")]
     }
 
     start = time.perf_counter()
     result = await policy_router(state)
     elapsed = time.perf_counter() - start
 
-    print(f"\n[policy_router] calendar request: {elapsed:.3f}s")
+    print(f"\n[policy_router] item request: {elapsed:.3f}s")
 
     assert elapsed < timing_threshold['policy_router'], (
         f"policy_router took {elapsed:.3f}s, exceeds {timing_threshold['policy_router']}s threshold"
@@ -49,12 +49,12 @@ async def test_refuse_request_speed(verify_api_key, timing_threshold):
 
 @pytest.mark.asyncio
 async def test_complex_request_speed(verify_api_key, timing_threshold):
-    """Benchmark longer multi-sentence scheduling request."""
+    """Benchmark longer multi-sentence request."""
     state = {
         'messages': [HumanMessage(content=(
-            "I need to schedule a dentist appointment for next Tuesday at 2pm. "
-            "Also, can you check if I have any conflicts that day? "
-            "The appointment should be about an hour long."
+            "Create a new item called Quarterly Report for me. "
+            "Also, can you check if I already have an item with that name? "
+            "Update it if it exists."
         ))]
     }
 

@@ -9,20 +9,24 @@ from dotenv import load_dotenv
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 load_dotenv()
-ASSISTANT_MCP = os.getenv('ASSISTANT_MCP_URL')
+# TODO(template): point this at your MCP server (see .env.example)
+EXAMPLE_MCP = os.getenv('EXAMPLE_MCP_URL', 'http://localhost:8000/mcp')
 
 CLIENT = MultiServerMCPClient(
     {
-        'assistant': {
+        'example': {
             'transport': 'http',
-            'url': ASSISTANT_MCP
+            'url': EXAMPLE_MCP
         }
     }
 )
+# placeholder domain - swap for your real MCP tool types and tools
+# TODO(template): map each tool type to the tools your MCP server exposes
 TOOL_MAPPING = {
-    'calendar': ["list_calendars", "list_events", "create_event", "update_event"],
+    'example': ["list_items", "get_item", "create_item", "update_item"],
 }
-HITL_TOOLS = {'create_event', 'update_event'}
+# tools that require human-in-the-loop confirmation before executing
+HITL_TOOLS = {'create_item', 'update_item'}
 
 _tools_cache = None
 _cache_lock = asyncio.Lock()
